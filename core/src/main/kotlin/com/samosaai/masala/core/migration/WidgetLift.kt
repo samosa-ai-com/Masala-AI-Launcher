@@ -10,8 +10,8 @@ import com.samosaai.masala.core.contract.WidgetSection
 import com.samosaai.masala.core.contract.WidgetSpec
 
 /**
- * Moves inline widgets into the widget library (layout schema 3, plan `docs/plans/widget-maker.md`
- * §6.1): every inline [WidgetSpec] becomes a [WidgetRef], and the specs come back for the caller to
+ * Moves inline widgets into the widget library (layout schema 3): every inline [WidgetSpec] becomes a
+ * [WidgetRef], and the specs come back for the caller to
  * save. Pure: the app's repository saves [Lifted.widgets] and the new layout in one transaction.
  *
  * Ids are kept, so a widget's storage and tap weights (keyed by widget id) carry over. When the

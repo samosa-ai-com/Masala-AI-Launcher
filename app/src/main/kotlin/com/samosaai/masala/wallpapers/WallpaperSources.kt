@@ -6,8 +6,8 @@ import kotlinx.coroutines.withContext
 import java.io.File
 
 /**
- * Turns a routine's `source` into a file [com.samosaai.masala.tools.WallpaperTool] can set
- * (plan `docs/plans/wallpaper-routines.md` §3). Three forms:
+ * Turns a routine's `source` into a file [com.samosaai.masala.tools.WallpaperTool] can set.
+ * Three forms:
  *
  * - `asset:<file>` — a bundled wallpaper, extracted once into the app's files dir so it keeps a
  *   stable path (the cache can be cleared between runs).

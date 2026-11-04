@@ -123,7 +123,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
- * AI meeting notes (plan `docs/plans/meeting-notes.md` §6): the list, the live recorder and the
+ * AI meeting notes: the list, the live recorder and the
  * finished note. One activity, three destinations — the shape of the reference screens, in Masala's
  * theme.
  */

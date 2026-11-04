@@ -490,7 +490,7 @@ object MasalaToolDefinitions {
         }
     )
 
-    // Generated home widgets (plan docs/plans/widget-maker.md §7.2).
+    // Generated home widgets.
     val listWidgets = tool(
         "list_widgets",
         "List the widget library: id, title, where each widget sits on home. " +
@@ -623,7 +623,7 @@ object MasalaToolDefinitions {
         },
     )
 
-    // Stream sources for live media widgets (plan docs/plans/widget-maker.md §7.2).
+    // Stream sources for live media widgets.
     val listStreamSources = tool(
         "list_stream_sources",
         "The cameras and streams the phone knows: name, kind and whether it plays. " +

@@ -16,7 +16,7 @@ import androidx.compose.ui.window.Dialog
 import com.samosaai.masala.R
 
 /**
- * Empty-space long-press on home (plan `docs/plans/wallpaper-generation.md`): Change
+ * Empty-space long-press on home: Change
  * wallpaper (the shared catalog), Add widget (the sheet as before), Settings.
  */
 @Composable

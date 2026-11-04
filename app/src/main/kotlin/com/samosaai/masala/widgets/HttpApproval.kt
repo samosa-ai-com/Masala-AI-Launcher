@@ -6,7 +6,7 @@ import com.samosaai.masala.core.contract.WidgetComponent
 import com.samosaai.masala.core.contract.WidgetSpec
 
 /**
- * Host approval for web values (plan `docs/plans/widget-maker.md` §5): a widget may fetch a host
+ * Host approval for web values: a widget may fetch a host
  * only once the user said yes; a changed host asks again. Approvals are per widget id and host,
  * in SharedPreferences — not in the spec, never in a prompt.
  */

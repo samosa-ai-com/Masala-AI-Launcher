@@ -41,7 +41,7 @@ import com.samosaai.masala.core.widgets.WidgetTemplates
 import com.samosaai.masala.widgets.WidgetLibrary
 
 /**
- * Home long-press → Add widget (plan `docs/plans/widget-gallery.md`): the library as a gallery —
+ * Home long-press → Add widget: the library as a gallery —
  * a still of each widget, searchable and shelved by category — plus Describe, Manage and Settings.
  * The preview is the widget's own spec rendered with sample values, so what is shown is what gets
  * placed.

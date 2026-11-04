@@ -14,7 +14,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * Plan `docs/plans/widget-maker.md` §10 on the device: the fake camera on the dev machine
+ * On the device: the fake camera on the dev machine
  * (`ffmpeg` MJPEG + snapshot JPEG + progressive MP4, reached at 10.0.2.2) plays through the
  * whole stack — add source, seal nothing (no credentials here), probe it, and point a
  * snapshot widget at it. RTSP/HLS need `mediamtx` and stay manual.

@@ -5,8 +5,8 @@ import com.samosaai.masala.core.contract.MasalaJson
 import com.samosaai.masala.core.contract.WidgetPrefs
 
 /**
- * A widget's own settings, kept in its existing state map under [KEY] (plan
- * `docs/plans/widgets-functional-pass.md` §2.1). No new table: the state map already survives
+ * A widget's own settings, kept in its existing state map under [KEY]. No new table: the state map already
+ * survives
  * restarts per widget id, and `WidgetSpec.resolved` applies these to a copy before drawing.
  */
 object WidgetPrefsStore {

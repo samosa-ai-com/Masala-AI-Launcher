@@ -23,7 +23,7 @@ import java.io.File
 import java.util.concurrent.TimeUnit
 
 /**
- * General image creation (plan `docs/plans/media-tools.md`): the same configured
+ * General image creation: the same configured
  * image endpoint as wallpapers, but square-ish output saved under
  * `filesDir/generated/` and returned as Produced("image") for the chat card.
  * Portrait wallpaper stays in [GenerateWallpaperTool].

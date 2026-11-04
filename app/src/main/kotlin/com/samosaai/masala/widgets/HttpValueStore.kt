@@ -16,7 +16,7 @@ import kotlinx.coroutines.withContext
 data class HttpEntry(val value: String, val fetchedAt: Long)
 
 /**
- * Fetched web values (plan `docs/plans/widget-maker.md` §5): `widget_http_values` rows keyed by
+ * Fetched web values: `widget_http_values` rows keyed by
  * widget + URL + path, kept in memory for the renderer. Foreground polls and the background
  * worker both write through [refresh]; failures keep the last value with its age.
  *

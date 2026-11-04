@@ -22,7 +22,7 @@ import com.samosaai.masala.R
 import com.samosaai.masala.core.contract.WidgetSpec
 
 /**
- * A generated widget's menu on home (plan `docs/plans/widget-maker.md` W2): edit it with AI right
+ * A generated widget's menu on home: edit it with AI right
  * here, remove it from home (every placement, one undoable version), resize within its own range,
  * or open it in the manager.
  */

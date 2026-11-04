@@ -9,7 +9,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
 
 /**
- * The two routine tools (plan `docs/plans/wallpaper-routines.md` §4): save a routine the model
+ * The two routine tools: save a routine the model
  * authored, and explain what is showing now and why.
  *
  * A routine is checked before it is stored — shape, time windows, the home-only target — and a

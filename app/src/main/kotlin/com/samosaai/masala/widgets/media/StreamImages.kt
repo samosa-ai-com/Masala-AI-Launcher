@@ -33,8 +33,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
- * A still image refreshed from a stream source while its page is showing (plan `docs/plans/widget-maker.md`
- * §4.1): polls every [everySeconds] (at least 2 s), keeps the last frame when a poll fails, and
+ * A still image refreshed from a stream source while its page is showing: polls every [everySeconds] (at
+ * least 2 s), keeps the last frame when a poll fails, and
  * says so instead of going blank. Off-screen pages keep their last frame and fetch nothing:
  * the pager pre-composes neighbours, so composition alone can't gate it. Credentials come from
  * the store, never from the widget.

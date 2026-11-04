@@ -7,7 +7,7 @@ import android.media.MediaPlayer
 import com.samosaai.masala.R
 
 /**
- * The sounds a widget can make (plan `docs/plans/widget-gallery.md` §4). Kept to two: a click for
+ * The sounds a widget can make. Kept to two: a click for
  * buttons, and a soft two-note chime for a timer that reaches zero.
  *
  * The chime is **bundled** rather than the system notification tone: reading the user's ringtone

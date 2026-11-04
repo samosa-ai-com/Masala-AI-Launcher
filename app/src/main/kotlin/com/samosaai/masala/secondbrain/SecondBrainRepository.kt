@@ -16,7 +16,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.withContext
 
 /**
- * The Second Brain repository (plan `docs/plans/second-brain-port.md`, P2): file-backed
+ * The Second Brain repository: file-backed
  * memory over [SecondBrainStore], replacing the wiki table. Pages are detail records
  * (areas/people/notes). The agent writes through the gated store API; every change can be undone.
  *

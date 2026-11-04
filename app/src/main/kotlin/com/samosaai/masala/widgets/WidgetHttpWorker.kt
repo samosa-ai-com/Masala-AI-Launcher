@@ -12,7 +12,7 @@ import com.samosaai.masala.data.MasalaDatabase
 import java.util.concurrent.TimeUnit
 
 /**
- * Background web values (plan `docs/plans/widget-maker.md` §5): every 15 minutes, each `http`
+ * Background web values: every 15 minutes, each `http`
  * binding with `background` set refreshes into `widget_http_values`. Widgets without one cost a
  * single library read and nothing else; failures keep the last value with its age. No private
  * data rides along: the checker already rejects templated URLs at save time.

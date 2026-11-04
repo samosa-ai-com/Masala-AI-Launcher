@@ -13,7 +13,7 @@ import com.samosaai.masala.HomeActivity
 import com.samosaai.masala.R
 
 /**
- * The "Masala is still working" notice (plan `docs/plans/chat-background.md`): a
+ * The "Masala is still working" notice: a
  * turn the user started keeps running after the chat is minimized, closed or
  * covered, so the progress stays visible. One live notice at a time (fixed id,
  * updated in place); tapping it reopens the current thread, and it clears when

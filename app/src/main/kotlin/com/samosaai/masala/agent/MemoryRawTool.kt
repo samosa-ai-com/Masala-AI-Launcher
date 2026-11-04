@@ -23,7 +23,7 @@ import kotlinx.serialization.json.putJsonObject
 import java.io.InputStream
 
 /**
- * `memory_file_raw` (plan `docs/plans/second-brain-robust.md`, S4): files an original (a recording, a PDF,
+ * `memory_file_raw`: files an original (a recording, a PDF,
  * a photo) into the Second Brain's raw/ folder, or links a big one where it already lives. Asks first.
  *
  * Copy vs link (D4): a picked file (`content://`) or anything under a temp or cache path is always copied.

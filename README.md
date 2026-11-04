@@ -1,6 +1,6 @@
 # Masala
 
-An AI home-screen launcher for Android. Start with `AGENTS.md` (entry point) and `docs/plans/` (feature notes).
+An AI home-screen launcher for Android. Start with `AGENTS.md` (entry point).
 
 ## Modules
 

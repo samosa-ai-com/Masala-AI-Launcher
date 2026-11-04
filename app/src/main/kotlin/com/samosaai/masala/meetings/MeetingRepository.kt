@@ -31,7 +31,7 @@ import kotlinx.serialization.builtins.serializer
 
 /**
  * Every meeting the app knows about: the session row, its 5-minute chunks and the speaker-labelled
- * turns (plan `docs/plans/meeting-notes.md` §4). Audio stays in app-private files under
+ * turns. Audio stays in app-private files under
  * `files/meetings/<id>/`; deleting a meeting deletes the folder with it.
  *
  * All writes are suspend and off the main thread; the screens read flows.

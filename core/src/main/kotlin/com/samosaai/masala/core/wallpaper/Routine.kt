@@ -5,7 +5,7 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 /**
- * A wallpaper that follows a rhythm (plan `docs/plans/wallpaper-routines.md`). A routine is an
+ * A wallpaper that follows a rhythm. A routine is an
  * ordered list of rules; the first rule whose conditions all hold decides the picture, and
  * [defaultWallpaperId] is what applies when none does. Home only in v1: lock-screen rotation is
  * a different promise to the user and waits.

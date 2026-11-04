@@ -3,7 +3,7 @@ package com.samosaai.masala.core.contract
 import kotlinx.serialization.Serializable
 
 /**
- * A single widget's own settings (plan `docs/plans/widgets-functional-pass.md` §2.1). Templates are
+ * A single widget's own settings. Templates are
  * shared library rows, so a goal, a duration or a place belongs to the *placement*, not the
  * template: this is stored in the widget's state map and applied to a copy of the spec before it is
  * drawn ([WidgetSpec.resolved]). Nothing here changes the widget's id, keys or actions, so the

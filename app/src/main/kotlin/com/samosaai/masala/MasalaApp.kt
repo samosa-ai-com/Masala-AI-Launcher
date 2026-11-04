@@ -107,7 +107,7 @@ class MasalaApp : Application() {
     /** Every generated widget's own values (counters, ticks); shared by home and the manager. */
     val widgetStates by lazy { com.samosaai.masala.widgets.WidgetStateStore(scope, database.widgetStates()) }
 
-    /** AI meeting notes (plan `docs/plans/meeting-notes.md`): sessions, recording, transcription, notes. */
+    /** AI meeting notes: sessions, recording, transcription, notes. */
     val meetingSettings by lazy { com.samosaai.masala.meetings.MeetingSettings(this) }
 
     val meetings by lazy { com.samosaai.masala.meetings.MeetingRepository(this, database, scope) }
@@ -342,7 +342,7 @@ class MasalaApp : Application() {
 
     /** Scheduled tasks and Second Brain notes, linked both ways (plan `second-brain-robust.md`, S5). */
     /**
-     * What Masala's own widgets show (plan `docs/plans/widget-gallery.md` §4): the Second Brain's
+     * What Masala's own widgets show: the Second Brain's
      * size and its newest entry. Empty until there is something to say, so a widget can show its
      * placeholder instead of a zero.
      */

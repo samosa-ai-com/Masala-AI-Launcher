@@ -22,7 +22,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * Plan `docs/plans/widget-maker.md` W5 on the device: a local JSON server on the dev machine
+ * On the device: a local JSON server on the dev machine
  * (10.0.2.2) feeds a web value through fetch, store, checker, approval and placement.
  */
 @RunWith(AndroidJUnit4::class)

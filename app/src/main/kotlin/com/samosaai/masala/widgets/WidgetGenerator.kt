@@ -14,7 +14,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 
 /**
- * Sentence → validated widget (plan `docs/plans/widget-maker.md` §7.3), the same shape as
+ * Sentence → validated widget, the same shape as
  * `LayoutGenerator`: structured output → [WidgetChecker] → one repair turn with the error list →
  * if still failing, keep nothing. Never saves a widget that failed: transport trouble gives
  * [Result.Failed], checker trouble gives [Result.Rejected], and only a clean spec gives

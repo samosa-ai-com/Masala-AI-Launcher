@@ -124,7 +124,7 @@ data class StackSection(
     val widgetIds: List<String> get() = if (refs.isNotEmpty()) refs.map { it.widgetId } else widgets.map { it.id }
 }
 
-/** A generated HTML mini-app drawn at widget size (plan `docs/plans/widget-maker.md` §3.3). */
+/** A generated HTML mini-app drawn at widget size. */
 @Serializable
 @SerialName("html")
 data class HtmlSection(
@@ -153,7 +153,7 @@ enum class SkillWidgetSize {
 }
 
 /**
- * A launcher grid inside a page (plan `docs/plans/home-cell-grid.md`): icons and widgets each sit at
+ * A launcher grid inside a page: icons and widgets each sit at
  * a cell with a span, so small widgets share a row and a drag lands on a cell. Rows grow as needed.
  */
 @Serializable

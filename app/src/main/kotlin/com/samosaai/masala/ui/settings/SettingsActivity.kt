@@ -994,7 +994,7 @@ class SettingsActivity : ComponentActivity() {
     }
 
     /**
-     * AI meeting notes (plan `docs/plans/meeting-notes.md`): where transcription goes, what it keeps,
+     * AI meeting notes: where transcription goes, what it keeps,
      * and the way into the app. The older quick recorder keeps its own page, untouched.
      */
     @Composable

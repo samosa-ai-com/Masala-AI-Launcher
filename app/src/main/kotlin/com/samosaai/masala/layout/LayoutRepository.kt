@@ -154,7 +154,7 @@ class LayoutRepository(
 
     /**
      * Schema 3 once: every inline widget still saved in the layout moves into the library and the
-     * layout keeps a ref, as one undoable version (plan `docs/plans/widget-maker.md` §6.1). Mode
+     * layout keeps a ref, as one undoable version. Mode
      * patches lift too — later loads find no inline widgets anywhere and do nothing. The push
      * happens whenever the layout still differs (even with nothing new to save), so a crash
      * between the library save and the push resumes into the same refs instead of stranding
@@ -184,7 +184,7 @@ class LayoutRepository(
 
     /**
      * Schema 4 once per install: the home's widget sections become one cell grid each run, looking
-     * as before (plan `docs/plans/home-cell-grid.md`), as one undoable version. Once only, so an undo
+     * as before, as one undoable version. Once only, so an undo
      * back past it stays undone; later placements land in grids anyway.
      */
     private suspend fun foldIntoCells() {

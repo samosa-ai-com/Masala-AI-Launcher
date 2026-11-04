@@ -15,7 +15,7 @@ import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
 
 /**
- * Checks one generated widget (plan `docs/plans/widget-maker.md` §7.3): what the schema can't say —
+ * Checks one generated widget: what the schema can't say —
  * sizes, rules, actions, icons, binding keys, media and web limits, and that no URL carries a secret.
  * [LayoutChecker] calls it for every widget in a layout; the widget library and the Widget Maker call
  * it on a widget alone. Problems carry JSON paths so a repair turn knows what to fix.

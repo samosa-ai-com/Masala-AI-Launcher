@@ -8,7 +8,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
 /**
- * Wallpaper routines on disk (plan `docs/plans/wallpaper-routines.md` §6): one JSON row each, so
+ * Wallpaper routines on disk: one JSON row each, so
  * the schema can grow without a migration. Unreadable rows are skipped, never fatal.
  */
 class WallpaperRoutineStore(private val dao: WallpaperRoutineDao) {

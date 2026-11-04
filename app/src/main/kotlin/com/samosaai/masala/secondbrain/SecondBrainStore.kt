@@ -6,7 +6,7 @@ import java.time.LocalDate
 import kotlin.io.extension
 
 /**
- * File-based Second Brain under [root] (plan `docs/plans/second-brain-port.md`, P1):
+ * File-based Second Brain under [root]:
  * SOUL.md (identity) + MEMORY.md (map) + user.md (profile), detail records in
  * areas/ + people/ + notes/ with YAML frontmatter, raw drops in raw/, `[[links]]`
  * between them. Reads are capped so a huge file can never stall a run; writes go

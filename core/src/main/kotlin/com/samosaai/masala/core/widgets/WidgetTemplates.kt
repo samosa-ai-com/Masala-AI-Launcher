@@ -5,7 +5,7 @@ import com.samosaai.masala.core.contract.WidgetSpec
 import kotlinx.serialization.Serializable
 
 /**
- * A starting point for a widget (plan `docs/plans/widget-maker.md` §6.3): shown in the Add widget
+ * A starting point for a widget: shown in the Add widget
  * sheet and named to the Widget Maker by its one-line [description].
  */
 @Serializable

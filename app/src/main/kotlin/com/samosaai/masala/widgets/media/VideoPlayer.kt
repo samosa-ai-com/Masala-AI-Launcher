@@ -36,7 +36,7 @@ import kotlinx.coroutines.isActive
 
 
 /**
- * What live video on home needs beyond the widget itself (plan `docs/plans/widget-maker.md` §4.3):
+ * What live video on home needs beyond the widget itself:
  * the 2-player pool, whether home is showing (resumed and the drawer shut), and where a tap goes.
  */
 data class MediaHost(

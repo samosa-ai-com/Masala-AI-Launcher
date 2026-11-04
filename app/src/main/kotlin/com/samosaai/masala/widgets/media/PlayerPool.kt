@@ -7,7 +7,7 @@ import androidx.media3.common.MediaItem
 import androidx.media3.exoplayer.ExoPlayer
 
 /**
- * Two live players for home (plan `docs/plans/widget-maker.md` §4.3, D3 fixed): one ExoPlayer per
+ * Two live players for home: one ExoPlayer per
  * stream URL, muted, LRU-evicted. A third visible video widget falls back to snapshot mode with a
  * Live button that steals the least recently touched slot. Everything here runs on the main
  * thread: ExoPlayer needs a Looper.

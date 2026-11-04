@@ -23,7 +23,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
 /**
- * The Widget Maker's tools (plan `docs/plans/widget-maker.md` §7.2), registered in `MasalaApp`
+ * The Widget Maker's tools, registered in `MasalaApp`
  * next to the private prototype's. Library writes run unattended — a made or revised widget only lands in the
  * versioned library, and the chat shows it as a preview card. The gate asks on what the user can
  * see or lose: home placement, removal, deletion, and new stream sources (plan W3 exit: the gate

@@ -10,7 +10,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 
 /**
- * One web value fetch (plan `docs/plans/widget-maker.md` §5): GETs the URL (at most [MAX_BYTES]),
+ * One web value fetch: GETs the URL (at most [MAX_BYTES]),
  * picks [HttpBinding.jsonPath] and stringifies it for the card. Failures return null, so the card
  * keeps the last value with its age.
  *

@@ -100,7 +100,7 @@ abstract class MasalaDatabase : RoomDatabase() {
             }
         }
 
-        /** Widget library (plan `docs/plans/widget-maker.md` §6.1): specs plus the last versions of each. */
+        /** Widget library: specs plus the last versions of each. */
         val MIGRATION_5_6 = object : Migration(5, 6) {            override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("CREATE TABLE IF NOT EXISTS `widgets` (`id` TEXT NOT NULL, `specJson` TEXT NOT NULL, `tier` TEXT NOT NULL, `title` TEXT, `createdBy` TEXT NOT NULL, `createdAt` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL, PRIMARY KEY(`id`))")
                 db.execSQL("CREATE TABLE IF NOT EXISTS `widget_versions` (`widgetId` TEXT NOT NULL, `version` INTEGER NOT NULL, `specJson` TEXT NOT NULL, `createdAt` INTEGER NOT NULL, PRIMARY KEY(`widgetId`, `version`))")
@@ -108,28 +108,28 @@ abstract class MasalaDatabase : RoomDatabase() {
             }
         }
 
-        /** Stream sources (plan `docs/plans/widget-maker.md` §4.2): registry without secrets. */
+        /** Stream sources: registry without secrets. */
         val MIGRATION_6_7 = object : Migration(6, 7) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("CREATE TABLE IF NOT EXISTS `stream_sources` (`id` TEXT NOT NULL, `name` TEXT NOT NULL, `kind` TEXT NOT NULL, `url` TEXT NOT NULL, `snapshotUrl` TEXT, `secret` TEXT, `transport` TEXT, `createdAt` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL, PRIMARY KEY(`id`))")
             }
         }
 
-        /** Fetched web values (plan `docs/plans/widget-maker.md` §5): display strings and ages. */
+        /** Fetched web values: display strings and ages. */
         val MIGRATION_7_8 = object : Migration(7, 8) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("CREATE TABLE IF NOT EXISTS `widget_http_values` (`key` TEXT NOT NULL, `widgetId` TEXT NOT NULL, `value` TEXT NOT NULL, `fetchedAt` INTEGER NOT NULL, PRIMARY KEY(`key`))")
             }
         }
 
-        /** Generated wallpapers (plan `docs/plans/wallpaper-generation.md`): file + prompt catalog. */
+        /** Generated wallpapers: file + prompt catalog. */
         val MIGRATION_8_9 = object : Migration(8, 9) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("CREATE TABLE IF NOT EXISTS `wallpapers` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `fileName` TEXT NOT NULL, `prompt` TEXT NOT NULL, `style` TEXT NOT NULL, `createdAt` INTEGER NOT NULL)")
             }
         }
 
-        /** Mini-app media bridge (plan `docs/plans/media-tools.md`): per-app opt-in, default off. */
+        /** Mini-app media bridge: per-app opt-in, default off. */
         val MIGRATION_10_11 = object : Migration(10, 11) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("CREATE TABLE IF NOT EXISTS `wallpaper_routines` (`id` TEXT NOT NULL, `json` TEXT NOT NULL, `updatedAt` INTEGER NOT NULL, PRIMARY KEY(`id`))")
@@ -137,7 +137,7 @@ abstract class MasalaDatabase : RoomDatabase() {
         }
 
         /**
-         * AI meeting notes (plan `docs/plans/meeting-notes.md`): sessions, their 5-minute chunks and
+         * AI meeting notes: sessions, their 5-minute chunks and
          * the speaker-labelled turns. Audio stays in app-private files; these rows are the index.
          */
         /** Speaker count on the session, for the widget without a join. */
@@ -222,7 +222,7 @@ interface AppLaunchDao {
 }
 
 /**
- * One AI-generated wallpaper (plan `docs/plans/wallpaper-generation.md`): the file under
+ * One AI-generated wallpaper: the file under
  * `filesDir/wallpapers/` plus the prompt that made it, so the catalog can search it.
  */
 @Entity(tableName = "wallpapers")
@@ -427,7 +427,7 @@ interface UsageWeightDao {
     suspend fun upsert(entity: UsageWeightEntity)
 }
 
-/** One widget in the library (plan `docs/plans/widget-maker.md` §6.1): the spec as JSON plus who made it. */
+/** One widget in the library: the spec as JSON plus who made it. */
 @Entity(tableName = "widgets")
 data class WidgetEntity(
     @PrimaryKey val id: String,
@@ -483,7 +483,7 @@ interface WidgetVersionDao {
     suspend fun deleteForWidget(widgetId: String)
 }
 
-/** One camera or stream a widget may show (plan `docs/plans/widget-maker.md` §4.2). */
+/** One camera or stream a widget may show. */
 @Entity(tableName = "stream_sources")
 data class StreamSourceEntity(
     @PrimaryKey val id: String,
@@ -518,7 +518,7 @@ interface StreamSourceDao {
     suspend fun delete(id: String)
 }
 
-/** One fetched web value (plan `docs/plans/widget-maker.md` §5): the display string and its age. */
+/** One fetched web value: the display string and its age. */
 @Entity(tableName = "widget_http_values")
 data class WidgetHttpValueEntity(
     @PrimaryKey val key: String,
@@ -639,7 +639,7 @@ data class WatchEntity(
 
 
 /**
- * One recorded meeting (plan `docs/plans/meeting-notes.md`). Audio lives in
+ * One recorded meeting. Audio lives in
  * `files/meetings/<id>/chunk-NNN.m4a`; the note is Markdown plus the structured JSON it came from.
  * Status values are in `core/meeting/MeetingStatus` — they are strings so the DB stays a dumb store.
  */

@@ -1,7 +1,7 @@
 package com.samosaai.masala.core.wallpaper
 
 /**
- * Checks a routine before it is saved (plan `docs/plans/wallpaper-routines.md` §4): shape, sane
+ * Checks a routine before it is saved: shape, sane
  * windows, existing wallpaper ids, a bounded rule list. Problems carry JSON paths so a repair
  * turn knows what to fix, the same way [com.samosaai.masala.core.layout.LayoutChecker] does for
  * layouts.

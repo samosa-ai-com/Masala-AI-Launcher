@@ -551,7 +551,7 @@ private fun ModeChip(name: String, onClick: (() -> Unit)?) {
 private val CELL_HEIGHT = (com.samosaai.masala.core.migration.CellLift.ROWS_PER_CELL * 48).dp
 
 /**
- * A launcher grid (plan `docs/plans/home-cell-grid.md`): every cell at its column and row with its
+ * A launcher grid: every cell at its column and row with its
  * span. Cards fill their cell; a card taller than its cell is clipped until it is resized.
  */
 @Composable
@@ -1149,7 +1149,7 @@ internal fun Placeholder(title: String, note: String, rows: Int?) {
     }
 }
 
-/** Side margin for everything on home: cards, the search pill, the dock (plan `docs/plans/home-visual-polish.md`). */
+/** Side margin for everything on home: cards, the search pill, the dock. */
 internal val HOME_GUTTER = 16.dp
 
 /** A glass card straight on the wallpaper (home boards): card corners, stronger glass, white hairline. */

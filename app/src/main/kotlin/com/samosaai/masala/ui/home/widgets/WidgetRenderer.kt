@@ -79,7 +79,7 @@ import java.time.LocalDateTime
 import kotlinx.coroutines.delay
 
 /**
- * What a generated widget needs from home (plan `docs/plans/widget-maker.md` W1): the current
+ * What a generated widget needs from home: the current
  * snapshot for context bindings, the widget's own stored values, and where actions go. The
  * renderer never touches the library: the layout already carries the spec inline.
  */

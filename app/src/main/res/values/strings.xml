@@ -947,7 +947,7 @@
     <string name="permission_health_connect">Health Connect</string>
     <string name="permission_health_connect_description">Steps and sleep</string>
 
-    <!-- AI meeting notes (plan docs/plans/meeting-notes.md) -->
+    <!-- AI meeting notes -->
     <string name="meeting_title">Meeting notes</string>
     <string name="meeting_app_title">AI Notes</string>
     <string name="meeting_record">Record a meeting</string>

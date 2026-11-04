@@ -30,7 +30,7 @@ enum class StreamKind {
 }
 
 /**
- * The `stream_sources` registry (plan `docs/plans/widget-maker.md` §4.2): names, kinds and URLs
+ * The `stream_sources` registry: names, kinds and URLs
  * without userinfo. Usernames and passwords are sealed by the Keystore ([KeyCipher]) into the
  * row's `secret` blob; only [urlWithCredentials] ever reassembles a credentialed URL, and only
  * for the player, the snapshot poller and `test_stream` — never for a layout, a prompt or the log.

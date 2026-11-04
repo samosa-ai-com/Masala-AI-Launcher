@@ -53,7 +53,7 @@ import com.samosaai.masala.ui.home.MicButton
 import com.samosaai.masala.ui.theme.MasalaTheme
 
 /**
- * The one composer for asking Masala (plan `docs/plans/reply-sheet-refresh.md`): a filled pill with the
+ * The one composer for asking Masala: a filled pill with the
  * attach pin on the left, the text, and on the right the mic plus a gold Send while there is something
  * to send, or the mic alone in the gold circle while it is empty. Attached photos sit inside the pill
  * above the text. The pin opens a small tray (Photo, Camera) and turns into its close button.

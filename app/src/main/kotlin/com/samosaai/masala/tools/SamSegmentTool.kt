@@ -21,7 +21,7 @@ import java.io.ByteArrayOutputStream
 import java.io.File
 
 /**
- * SAM 3.1 segmentation (plan `docs/plans/media-tools.md`): sends an image + a
+ * SAM 3.1 segmentation: sends an image + a
  * short noun phrase to `POST {base}/responses` (`model: "sam-3.1"`, same Bearer
  * key as everything else) and returns an annotated PNG (each object's decoded
  * mask painted as a tinted overlay with an edge outline, plus a very faint box),

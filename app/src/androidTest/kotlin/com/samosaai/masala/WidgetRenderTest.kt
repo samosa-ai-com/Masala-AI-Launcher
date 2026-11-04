@@ -28,7 +28,7 @@ import org.junit.runner.RunWith
 import java.time.LocalDateTime
 
 /**
- * Plan `docs/plans/widget-maker.md` W1's instrumented test: specs resolve and draw on a real
+ * Instrumented test: specs resolve and draw on a real
  * device, counters step, checklists tick, snapshot bindings read, and the W4/W5 tiers say so.
  */
 @RunWith(AndroidJUnit4::class)

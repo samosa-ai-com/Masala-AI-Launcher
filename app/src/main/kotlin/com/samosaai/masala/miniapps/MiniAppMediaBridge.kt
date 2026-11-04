@@ -14,7 +14,7 @@ import java.io.ByteArrayInputStream
 import java.io.File
 
 /**
- * Mediated media bridge for mini-apps (plan `docs/plans/media-tools.md`).
+ * Mediated media bridge for mini-apps.
  *
  * Mini-app JS has no keys and no network to the model endpoints. When Masala
  * allows it for an app ([MiniAppStore.mediaAllowed]), the app can call:

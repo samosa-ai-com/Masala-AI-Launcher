@@ -10,8 +10,8 @@ import com.samosaai.masala.R
 import com.samosaai.masala.widgets.HttpApproval
 
 /**
- * Host approval before a web-fetching widget goes on home (plan `docs/plans/widget-maker.md`
- * §5): names each host and its cadence. One approval per widget id and host; a changed host
+ * Host approval before a web-fetching widget goes on home: names each host and its cadence. One approval
+ * per widget id and host; a changed host
  * asks again.
  */
 @Composable

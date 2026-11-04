@@ -42,7 +42,7 @@ import com.samosaai.masala.widgets.WidgetPrefsStore
 import com.samosaai.masala.widgets.WidgetStateStore
 
 /**
- * One widget's own settings (plan `docs/plans/widgets-functional-pass.md` §2.1): the goal of a
+ * One widget's own settings: the goal of a
  * counter, a timer's minutes and sound, a checklist's reset, a web value's URL, a camera's source.
  * Stored per placement, so editing one Water widget leaves another's goal alone, and a template
  * stays the template. Reached from the widget's long-press menu.

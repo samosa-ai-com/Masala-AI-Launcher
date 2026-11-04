@@ -16,7 +16,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * Plan `docs/plans/widget-maker.md` W6 on the device: a mini app goes on home at widget size
+ * On the device: a mini app goes on home at widget size
  * through the real store and layout repository, and deleting it takes it off home.
  */
 @RunWith(AndroidJUnit4::class)

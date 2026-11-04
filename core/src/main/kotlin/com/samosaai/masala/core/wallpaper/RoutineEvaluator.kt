@@ -5,8 +5,8 @@ import java.time.LocalDate
 import java.time.LocalDateTime
 
 /**
- * Decides which wallpaper a set of routines wants right now (plan
- * `docs/plans/wallpaper-routines.md` §3). Pure: the same snapshot always gives the same answer,
+ * Decides which wallpaper a set of routines wants right now. Pure: the same snapshot always gives the same
+ * answer,
  * so the engine, the settings preview and the tests all agree.
  */
 object RoutineEvaluator {

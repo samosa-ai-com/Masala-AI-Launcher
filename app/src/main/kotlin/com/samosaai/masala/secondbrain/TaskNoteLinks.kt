@@ -6,8 +6,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * Keeps scheduled tasks and Second Brain notes linked both ways or not at all (plan
- * `docs/plans/second-brain-robust.md`, S5): the task carries [ScheduledTask.memoryNote], the note carries
+ * Keeps scheduled tasks and Second Brain notes linked both ways or not at all: the task carries
+ * [ScheduledTask.memoryNote], the note carries
  * `task_ref`. Deleting either side clears the other.
  */
 class TaskNoteLinks(

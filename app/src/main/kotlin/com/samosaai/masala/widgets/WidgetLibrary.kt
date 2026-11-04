@@ -15,7 +15,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.serialization.builtins.serializer
 
 /**
- * The widget library (plan `docs/plans/widget-maker.md` §6.1): every saved [WidgetSpec] by id, kept
+ * The widget library: every saved [WidgetSpec] by id, kept
  * in memory for the resolver and in Room (`widgets` + `widget_versions`, last 20 versions each).
  *
  * [version] changes on every save or delete, so the resolve cache re-resolves without the layout
@@ -103,8 +103,8 @@ class WidgetLibrary(
     }
 
     /**
-     * Adds the templates this install has never been offered, once (plan `docs/plans/widget-gallery.md`
-     * §4). An install from before the seeding bookkeeping is treated as having had the original
+     * Adds the templates this install has never been offered, once. An install from before the seeding
+     * bookkeeping is treated as having had the original
      * eight — so a user who deleted one does not get it back, but the new shelves do appear.
      */
     private suspend fun seedNewTemplates(existing: Set<String>) {

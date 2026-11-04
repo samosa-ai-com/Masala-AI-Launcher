@@ -49,7 +49,7 @@ import kotlinx.coroutines.withContext
 
 
 /**
- * One stream full-screen (plan `docs/plans/widget-maker.md` §4.3): plays with audio, a mute
+ * One stream full-screen: plays with audio, a mute
  * toggle, pinch-zoom, a snapshot-to-file button when the source has a snapshot URL, and a close
  * button. Back closes. Not exported; home opens it from a video tap.
  */

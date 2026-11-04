@@ -11,7 +11,7 @@ import kotlinx.serialization.json.putJsonObject
 
 
 /**
- * The `json_schema` the widget generator asks for (plan `docs/plans/widget-maker.md` §7.3). The
+ * The `json_schema` the widget generator asks for. The
  * shape mirrors what `WidgetChecker.parse` decodes (same `"type"` discriminators, same field
  * names), so a valid reply parses with no translation step.
  *

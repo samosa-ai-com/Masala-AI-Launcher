@@ -16,8 +16,8 @@ import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.coroutines.resume
 
 /**
- * `test_stream` behind the tool and the manager's Test button (plan `docs/plans/widget-maker.md`
- * §4): connects for at most [TIMEOUT_MS], then names the codec, the resolution and the latency —
+ * `test_stream` behind the tool and the manager's Test button: connects for at most [TIMEOUT_MS], then
+ * names the codec, the resolution and the latency —
  * or the error. Player kinds probe through a muted throwaway ExoPlayer on the main thread;
  * MJPEG and snapshot kinds probe over plain HTTP. Nothing is kept: no recording, no state.
  */

@@ -8,7 +8,7 @@ import java.io.File
 data class Wallpaper(val id: Long, val file: File, val prompt: String, val style: String, val createdAt: Long)
 
 /**
- * The wallpaper catalog (plan `docs/plans/wallpaper-generation.md`): prompts live in Room,
+ * The wallpaper catalog: prompts live in Room,
  * pictures in `filesDir/wallpapers/`. Deleting a row deletes its file.
  */
 class WallpaperStore(private val dao: WallpaperDao, private val dir: File) {

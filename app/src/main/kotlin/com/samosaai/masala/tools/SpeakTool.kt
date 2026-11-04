@@ -13,7 +13,7 @@ import kotlinx.coroutines.withContext
 import java.io.File
 
 /**
- * Simple text-to-speech (plan `docs/plans/media-tools.md`): synthesizes with the
+ * Simple text-to-speech: synthesizes with the
  * configured voice output, saves the audio file, and plays it aloud.
  * Uses the same `voiceOut` + key the reply Read-aloud button uses; with no API
  * voice configured it speaks on-device and reports that no file was kept.

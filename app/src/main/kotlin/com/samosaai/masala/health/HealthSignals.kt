@@ -16,8 +16,7 @@ import java.time.LocalTime
 import java.time.ZoneId
 
 /**
- * The two numbers a home widget shows from Health Connect (plan
- * `docs/plans/widgets-functional-pass.md` §2.2): today's steps and last night's sleep.
+ * The two numbers a home widget shows from Health Connect: today's steps and last night's sleep.
  *
  * Read-only and grant-driven: nothing is asked for here and a missing grant simply leaves the value
  * null, which the card renders as "Needs Health Connect" with a way to the permission screen. The

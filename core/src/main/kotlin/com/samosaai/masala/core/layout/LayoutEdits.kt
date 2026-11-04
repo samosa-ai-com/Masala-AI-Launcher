@@ -262,7 +262,7 @@ object LayoutEdits {
         },
     )
 
-    // ---- generated widgets (plan docs/plans/widget-maker.md §6.1) ----
+    // ---- generated widgets ----
 
     /** What placing found: the new document, and where the section landed. */
     data class Placed(val doc: LayoutDoc, val pageId: String, val sectionId: String)
@@ -392,7 +392,7 @@ object LayoutEdits {
         else -> false
     }
 
-    // ---- cell grids (plan docs/plans/home-cell-grid.md) ----
+    // ---- cell grids ----
 
     /**
      * [keep] decides per widget id; cells whose widget goes are removed (a stack keeps the rest, an
@@ -526,7 +526,7 @@ object LayoutEdits {
         if (pageId != null && doc.pages.none { it.id == pageId }) return null
         val taken0 = doc.allIdsInDoc()
         val cellId = freeId("widget-$widgetId", taken0)
-        // A cell, so a narrow widget sits beside others (plan docs/plans/home-cell-grid.md, step 3).
+        // A cell, so a narrow widget sits beside others.
         val cell = Cell(cellId, 0, 0, spec?.size?.defaultW ?: 4, cellsHigh(height), CellContent.WidgetCell(WidgetRef(widgetId, rowsOverride)))
         val fits = { p: Page -> widgetRowsUsed(doc, p.id, specs) + addedRows(doc, p.id, cell) <= LayoutChecker.MAX_PAGE_ROWS }
         val page = if (fits(target)) target else doc.pages.firstOrNull(fits)
@@ -666,7 +666,7 @@ object LayoutEdits {
         }
     }
 
-    // ---- HTML widgets (plan docs/plans/widget-maker.md §3.3) ----
+    // ---- HTML widgets ----
 
     /** Every place a mini app sits on home at widget size. */
     fun htmlPlacements(doc: LayoutDoc, appId: String): List<WidgetPlacement> =

@@ -18,7 +18,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * Plan `docs/plans/widget-maker.md` W3 on the device: the tools create a widget from a spec,
+ * On the device: the tools create a widget from a spec,
  * place it on home, take it off, and delete it — through the real library and layout repository.
  * The sentence path (the model call) is covered without a model in `WidgetGeneratorTest`.
  */

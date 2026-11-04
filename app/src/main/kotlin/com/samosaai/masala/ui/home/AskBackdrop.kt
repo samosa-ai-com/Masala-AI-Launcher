@@ -93,7 +93,7 @@ fun AskIntro(
 private val Dim = Color(0xFF0C0C0E)
 
 /**
- * Home seen through the typing sheet (plan `docs/plans/reply-sheet-refresh.md`): a gradient that
+ * Home seen through the typing sheet: a gradient that
  * darkens towards the sheet, wallpaper included (it can't be blurred; the layout above it is), fading
  * in as the sheet opens. A tap on it closes the sheet. Hidden from TalkBack: the sheet carries Close.
  */

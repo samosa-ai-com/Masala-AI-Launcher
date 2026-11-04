@@ -7,8 +7,7 @@ import kotlinx.serialization.Serializable
  * A generated widget (arch §3.7): data, never code. The renderer draws [components] top to bottom.
  *
  * Since layout schema 3 a widget lives in the widget library and a layout points at it with a
- * [WidgetRef]; an inline spec is still read for one schema so older exports import (plan
- * `docs/plans/widget-maker.md` §6.1).
+ * [WidgetRef]; an inline spec is still read for one schema so older exports import.
  */
 @Serializable
 data class WidgetSpec(
@@ -205,8 +204,8 @@ sealed interface WidgetComponent {
         WidgetComponent
 
     /**
-     * A slowly turning wireframe globe with an optional value in its middle (plan
-     * `docs/plans/widget-gallery.md` §4). Decoration, but useful decoration: battery, steps or a
+     * A slowly turning wireframe globe with an optional value in its middle. Decoration, but useful
+     * decoration: battery, steps or a
      * count read as a live instrument. One per widget.
      */
     @Serializable

@@ -9,8 +9,7 @@ import java.time.LocalDate
 import java.time.temporal.IsoFields
 
 /**
- * Time-based resets a widget asks for in its settings (plan
- * `docs/plans/widgets-functional-pass.md` §3): a water counter starts the day at zero, a habit
+ * Time-based resets a widget asks for in its settings: a water counter starts the day at zero, a habit
  * checklist renews each morning, a budget resets on the first of the month.
  *
  * A marker (`@reset.<path>`) records the period the value was last cleared for, so this runs safely

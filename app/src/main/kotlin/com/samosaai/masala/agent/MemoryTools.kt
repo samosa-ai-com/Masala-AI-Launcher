@@ -24,7 +24,7 @@ import kotlinx.serialization.json.putJsonArray
 import kotlinx.serialization.json.putJsonObject
 
 /**
- * The Second Brain tools (plan `docs/plans/second-brain-robust.md`, S3). Reads run freely. Writes and edits
+ * The Second Brain tools. Reads run freely. Writes and edits
  * are CHANGES_SOMETHING, so unattended runs never get them, but they apply without a sheet: the user sees a
  * "Remembered" card with Undo (D1). Rewriting a dated note and deleting anything still ask.
  */

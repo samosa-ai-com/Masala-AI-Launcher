@@ -84,7 +84,7 @@ private sealed interface CatalogItem {
 }
 
 /**
- * Settings → Wallpapers (plan `docs/plans/wallpaper-catalog.md`): bundled premium wallpapers
+ * Settings → Wallpapers: bundled premium wallpapers
  * with category filters, the user's generated ones (searchable by prompt), a From-device tile,
  * and Generate with AI (opens home chat with a wallpaper prefill). The same screen the home
  * long-press "Change wallpaper" opens.
@@ -364,7 +364,7 @@ private fun WallpaperThumb(thumbKey: String, load: suspend () -> ImageBitmap?, m
 }
 
 /**
- * Routines at the top of the wallpapers page (plan `docs/plans/wallpaper-routines.md` §6): what is
+ * Routines at the top of the wallpapers page: what is
  * showing and when it next changes, the switches, and a way to ask for a new one. Home only.
  */
 @Composable

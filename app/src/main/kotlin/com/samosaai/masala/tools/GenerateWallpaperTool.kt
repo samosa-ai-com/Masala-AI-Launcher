@@ -24,7 +24,7 @@ import java.io.File
 import java.util.concurrent.TimeUnit
 
 /**
- * Generates a phone wallpaper from a text description (plan `docs/plans/wallpaper-generation.md`):
+ * Generates a phone wallpaper from a text description:
  * POSTs the configured image endpoint (`/images/generations`), saves the picture under
  * `filesDir/wallpapers/`, records its prompt in the [WallpaperStore] catalog (searchable),
  * and optionally applies it through [WallpaperTool]. A blank configured model means "ask the

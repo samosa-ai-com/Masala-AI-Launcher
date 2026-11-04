@@ -23,8 +23,7 @@ import kotlinx.coroutines.withContext
 import com.samosaai.masala.core.contract.resolved
 
 /**
- * A widget timer that keeps time outside the home screen (plan
- * `docs/plans/widgets-functional-pass.md` §2.3). The card shows the countdown; the alarm is what
+ * A widget timer that keeps time outside the home screen. The card shows the countdown; the alarm is what
  * actually rings when the card is not composed, the screen is off, or the phone is in another app.
  *
  * The deadline lives in the widget's state (`<key>`), a paused timer keeps the millis left

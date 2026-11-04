@@ -15,7 +15,7 @@ import kotlinx.serialization.builtins.MapSerializer
 import kotlinx.serialization.builtins.serializer
 
 /**
- * A generated widget's own values (plan `docs/plans/widget-maker.md` W1): counters, checklist ticks,
+ * A generated widget's own values: counters, checklist ticks,
  * timer deadlines, list lines — one string map per widget id, kept in `widget_state` as JSON.
  *
  * Numbers are stored as plain strings (`"3"`); checklist ticks as a JSON boolean array (`"[true,false]"`);

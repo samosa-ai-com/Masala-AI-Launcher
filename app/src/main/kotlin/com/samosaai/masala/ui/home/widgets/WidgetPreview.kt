@@ -25,7 +25,7 @@ import com.samosaai.masala.widgets.WidgetStateStore
 import java.time.LocalDateTime
 
 /**
- * A still of a widget, for the gallery and the manager (plan `docs/plans/widget-gallery.md` §3).
+ * A still of a widget, for the gallery and the manager.
  *
  * It renders the widget's own spec — never a screenshot — so a preview can't drift from what gets
  * placed. Values are samples: a half-filled counter, a partly ticked list, realistic context. No

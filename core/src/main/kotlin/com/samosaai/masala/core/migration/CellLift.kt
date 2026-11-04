@@ -15,7 +15,7 @@ import com.samosaai.masala.core.contract.WidgetSpec
 import com.samosaai.masala.core.layout.LayoutEdits
 
 /**
- * Folds a layout's widget sections into cell grids (plan `docs/plans/home-cell-grid.md`, step 1):
+ * Folds a layout's widget sections into cell grids:
  * each run of widget, stack, HTML and skill sections becomes one [CellGridSection], one full-width
  * cell per section, stacked in order, so the screen looks as before and can then be rearranged.
  *

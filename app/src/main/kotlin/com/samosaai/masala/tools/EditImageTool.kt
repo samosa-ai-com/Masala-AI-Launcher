@@ -25,7 +25,7 @@ internal fun appPrivateFile(filesCanonical: String, cacheCanonical: String, path
 }
 
 /**
- * Local image edits (plan `docs/plans/media-tools.md`): rotate / crop-square /
+ * Local image edits: rotate / crop-square /
  * resize / grayscale on a file already on disk. No network, no extra config —
  * the fallback the user chose when no hosted edit endpoint is available.
  */

@@ -5,7 +5,7 @@ import com.samosaai.masala.core.contract.BindingSource
 import com.samosaai.masala.core.contract.ContextSnapshot
 
 /**
- * Resolves a widget [Binding] to display values (plan `docs/plans/widget-maker.md` W1): storage reads
+ * Resolves a widget [Binding] to display values: storage reads
  * the widget's own map, the rest read the context snapshot. [BindingSource.MEDIA],
  * [BindingSource.HTTP], [BindingSource.STREAM_STATUS] and [BindingSource.SKILL_RESULT] need the app
  * stores that land in W4/W5, so they resolve to null until then and the renderer draws them as

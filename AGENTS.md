@@ -14,7 +14,7 @@ Key architectural facts:
 - **Structured layout, not a cell grid:** pages → sections → items, mode patches as overlays, versioned JSON with migrations, 50-version undo history. The model writes layouts/rules; the phone evaluates them.
 - **Safety:** every model output is checked (`LayoutChecker`); every state-changing tool goes `ActionDispatcher` / `MasalaToolExecutor` → `ConfirmationGate` → `ActionLog`.
 - **Stack:** Kotlin 2.4, AGP 8.13, compileSdk/targetSdk 36, minSdk 30, Compose Material3, Room + KSP, DataStore, WorkManager, Media3, pdfbox-android. OpenAI-compatible LLM endpoint configured via `local.properties` (gitignored).
-- **Spec lives in-repo, no new PRD:** design and sequencing notes under `docs/plans/`. If notes conflict, design wins for architecture, sequencing wins for order — flag the conflict, never silently resolve it.
+- **Spec lives in local plan files, no new PRD:** design and sequencing notes live under `docs/plans/` (gitignored, never pushed). If notes conflict, design wins for architecture, sequencing wins for order — flag the conflict, never silently resolve it.
 
 ---
 
@@ -34,7 +34,7 @@ Key architectural facts:
 ### 2.2 Keep the state files updated
 
 - **Keep a session handoff note updated.** Update it **at the end of every working session** (or after any meaningful milestone) with: current phase, last completed work, files touched, verification results, in-progress work, next steps, decisions/blockers. **Scope vs status:** plan docs record scope, the handoff note records status. Never log progress in both — the historical "Done in Phase 2" notes stay as record; new progress goes only in the handoff note + the feature's plan file.
-- **Every behavioral or architectural change must update the matching doc in the same change.** No code change ships without its doc update. Plan files live under `docs/plans/`; if you add a doc, add it to the index in §4.
+- **Every behavioral or architectural change must update the matching doc in the same change.** No code change ships without its doc update. Plan files live under `docs/plans/` (gitignored, local only); if you add a doc, add it to the index in §4.
 
 ### 2.3 Provenance + public-release rule (non-negotiable)
 
@@ -58,7 +58,7 @@ The repo was made public via history rewrite. Private material (non-public check
 
 | File | Purpose | Update when… |
 |------|---------|--------------|
-| `docs/plans/<feature>.md` | Per-feature plan (files, changes, verification, risks). One per phase/feature. | Planning and during implementation. |
+| `docs/plans/<feature>.md` | Per-feature plan (files, changes, verification, risks). One per phase/feature. Local only, gitignored. | Planning and during implementation. |
 | `THIRD_PARTY.md` | License attributions for copied-in material. | New MIT/Apache/OFL material added. |
 
 **If you add a doc file, add it to this table.**
@@ -81,7 +81,7 @@ Masala/
 │   ├── src/debug/                   ← DebugActivity (tool calls), ContextPanelActivity (fake context)
 │   └── src/androidTest/             ← ClassicHomeRenderTest
 └── docs/
-    └── plans/                       ← per-feature plan files (create as needed)
+    └── plans/                       ← per-feature plan files (local, gitignored)
 ```
 
 ---

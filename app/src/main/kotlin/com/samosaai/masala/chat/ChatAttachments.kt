@@ -32,8 +32,8 @@ import java.io.ByteArrayOutputStream
 import java.io.File
 
 /**
- * One image queued in the chat composer, or carried by a sent turn (plan
- * `docs/plans/chat-attachments.md`). Images are downscaled to JPEG base64 on the
+ * One image queued in the chat composer, or carried by a sent turn. Images are downscaled to JPEG base64
+ * on the
  * way in; documents are out of scope.
  */
 data class AttachedImage(

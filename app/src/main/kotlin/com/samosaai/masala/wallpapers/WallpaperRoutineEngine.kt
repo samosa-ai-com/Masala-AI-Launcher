@@ -26,7 +26,7 @@ import java.time.Duration
 import java.time.LocalDateTime
 
 /**
- * Applies wallpaper routines (plan `docs/plans/wallpaper-routines.md` §3).
+ * Applies wallpaper routines.
  *
  * Four triggers, all cheap and none of them a poll: app start / a return to home, a context
  * snapshot change (debounced), the next time-window boundary (an in-process timer while Masala is

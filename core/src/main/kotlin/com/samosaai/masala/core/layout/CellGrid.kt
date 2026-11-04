@@ -4,7 +4,7 @@ import com.samosaai.masala.core.contract.Cell
 import com.samosaai.masala.core.contract.CellGridSection
 
 /**
- * Pure placement on a [CellGridSection] (plan `docs/plans/home-cell-grid.md`). Cells never overlap;
+ * Pure placement on a [CellGridSection]. Cells never overlap;
  * a move or resize that lands on others pushes them down, like a stock launcher (decision D3).
  *
  * Every entry point clamps what it is given (columns, spans, positions), so bad layout data can

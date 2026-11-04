@@ -3,8 +3,8 @@ package com.samosaai.masala.widgets
 import android.content.Context
 
 /**
- * Which bundled templates this install has already been offered (plan `docs/plans/widget-gallery.md`
- * §4). Without it a template seeds once, on a fresh install, and an upgrade never shows the new
+ * Which bundled templates this install has already been offered. Without it a template seeds once, on a
+ * fresh install, and an upgrade never shows the new
  * ones; with it, a new template appears once and a deleted one never comes back.
  */
 interface WidgetSeedStore {

@@ -34,7 +34,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
- * A meeting recording that can run for hours (plan `docs/plans/meeting-notes.md` §4.2).
+ * A meeting recording that can run for hours.
  *
  * One `microphone` foreground service, one session row, one AAC file per [CHUNK_MINUTES] minutes in
  * `files/meetings/<id>/`. Chunking is what makes a three-hour meeting safe: each piece stays under
