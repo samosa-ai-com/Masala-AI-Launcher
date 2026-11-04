@@ -67,6 +67,7 @@ jobs:
           TAG: ${{ steps.version.outputs.tag }}
           ASSET: ${{ steps.version.outputs.asset }}
           NAME: ${{ steps.version.outputs.name }}
+          CODE: ${{ steps.version.outputs.code }}
         run: |
           DRY_RUN=false
           if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.dry_run }}" = "true" ]; then
@@ -74,7 +75,21 @@ jobs:
           fi
           echo "dry_run=$DRY_RUN" >> "$GITHUB_OUTPUT"
 
+          # What phones read now: update.json on the current main, not in this run's checkout. A
+          # re-run checks out the original commit, which predates the bot's update.json commit.
+          git fetch -q origin main
+          PUBLISHED=$(git show FETCH_HEAD:update.json 2>/dev/null || true)
+          PUB_CODE=0; PUB_NAME=""; PUB_SHA=""
+          if [ -n "$PUBLISHED" ]; then
+            PUB_CODE=$(jq -r '.versionCode // 0' <<<"$PUBLISHED")
+            PUB_NAME=$(jq -r '.versionName // ""' <<<"$PUBLISHED")
+            PUB_SHA=$(jq -r '.sha256 // ""' <<<"$PUBLISHED")
+          fi
+
           if [ "$DRY_RUN" = "true" ]; then
+            if [ "$CODE" -le "$PUB_CODE" ]; then
+              echo "::warning::versionCode $CODE is not above the published $PUB_CODE; a real release would stop here."
+            fi
             echo "Dry run: building and verifying $TAG without publishing."
             echo "should_release=true" >> "$GITHUB_OUTPUT"
             exit 0
@@ -87,7 +102,13 @@ jobs:
           fi
 
           if ! git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
-            echo "$TAG is new: releasing."
+            # Phones compare versionCode only (AppUpdates.isNewer), and Android won't install a lower
+            # one over a higher: a new name with an unchanged or lower code would reach nobody.
+            if [ "$CODE" -le "$PUB_CODE" ]; then
+              echo "::error::versionCode $CODE must be above the published $PUB_CODE ($PUB_NAME). Bump versionCode in app/build.gradle.kts."
+              exit 1
+            fi
+            echo "$TAG is new (versionCode $CODE, published ${PUB_CODE}): releasing."
             echo "should_release=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
@@ -96,23 +117,21 @@ jobs:
           # "nothing to do" once the release, its APK and the update.json phones read are all there.
           RECOVER="Recover with: gh release delete $TAG --yes; git push --delete origin $TAG — then re-run this workflow."
           ASSETS=$(gh release view "$TAG" --json assets --jq '.assets[] | "\(.name) \(.digest // "")"' 2>/dev/null || true)
-          LINE=$(printf '%s\n' "$ASSETS" | awk -v a="$ASSET" '$1 == a' | head -n1)
+          LINE=$(awk -v a="$ASSET" '$1 == a' <<<"$ASSETS" | head -n1)
           if [ -z "$LINE" ]; then
             echo "::error::$TAG is tagged but has no release carrying $ASSET. $RECOVER"
             exit 1
           fi
-          ASSET_SHA=$(printf '%s' "$LINE" | awk '{print $2}' | sed 's/^sha256://')
-          MANIFEST_NAME=$(jq -r '.versionName // ""' update.json 2>/dev/null || true)
-          MANIFEST_SHA=$(jq -r '.sha256 // ""' update.json 2>/dev/null || true)
-          if [ "$MANIFEST_NAME" != "$NAME" ]; then
-            echo "::error::$TAG is published but update.json advertises '${MANIFEST_NAME:-nothing}', so phones won't see it. $RECOVER"
+          ASSET_SHA=$(awk '{print $2}' <<<"$LINE" | sed 's/^sha256://')
+          if [ "$PUB_NAME" != "$NAME" ]; then
+            echo "::error::$TAG is published but update.json on main advertises '${PUB_NAME:-nothing}', so phones won't see it. $RECOVER"
             exit 1
           fi
-          if [ -n "$ASSET_SHA" ] && [ "$ASSET_SHA" != "$MANIFEST_SHA" ]; then
-            echo "::error::update.json's sha256 ($MANIFEST_SHA) doesn't match the published $ASSET ($ASSET_SHA): phones would reject the download. $RECOVER"
+          if [ -n "$ASSET_SHA" ] && [ "$ASSET_SHA" != "$PUB_SHA" ]; then
+            echo "::error::update.json's sha256 ($PUB_SHA) doesn't match the published $ASSET ($ASSET_SHA): phones would reject the download. $RECOVER"
             exit 1
           fi
-          echo "$TAG is already published and update.json points at it: nothing to do."
+          echo "$TAG is already published and update.json on main points at it: nothing to do."
           echo "should_release=false" >> "$GITHUB_OUTPUT"
 
       - name: Take release notes from CHANGELOG.md
@@ -198,10 +217,20 @@ jobs:
             echo "RELEASE_KEY_PASSWORD=$RELEASE_KEY_PASSWORD"
           } >> "$GITHUB_ENV"
 
-      # No model endpoint or key is passed: release builds compile in blank ones on purpose (users
-      # bring their own in Settings -> Models & keys).
+      # Release builds compile in a blank model endpoint, model and key on purpose (users bring their
+      # own in Settings -> Models & keys). Sentinel values are passed for every config input here, and
+      # the verify step fails if any of them reaches the APK: that proves the blanks win over whatever
+      # a build machine has set.
       - name: Assemble release APK
         if: steps.check.outputs.should_release == 'true'
+        env:
+          SAMOSA_API_URL: https://sentinel-samosa-api.invalid
+          MASALA_LLM_BASE_URL: https://sentinel-llm-base.invalid/v1/
+          MASALA_LLM_API_KEY: sentinel-llm-api-key-0f3c
+          MASALA_LLM_MODEL: sentinel-llm-model-0f3c
+          MASALA_STT_BASE_URL: https://sentinel-stt-base.invalid/v1/
+          MASALA_STT_API_KEY: sentinel-stt-api-key-0f3c
+          MASALA_STT_MODEL: sentinel-stt-model-0f3c
         run: ./gradlew --console=plain :app:assembleRelease
 
       - name: Verify the APK
@@ -216,13 +245,12 @@ jobs:
           CERTS=$("$BUILD_TOOLS/apksigner" verify --print-certs "$APK")
           echo "$CERTS"
           # The label differs across build-tools versions, so match the digest itself.
-          ACTUAL=$(printf '%s\n' "$CERTS" \
-            | sed -n 's/.*certificate SHA-256 digest: *\([0-9a-fA-F]\{64\}\).*/\1/p' | head -n1 | tr 'A-F' 'a-f')
+          ACTUAL=$(sed -n 's/.*certificate SHA-256 digest: *\([0-9a-fA-F]\{64\}\).*/\1/p' <<<"$CERTS" | head -n1 | tr 'A-F' 'a-f')
           if [ -z "$ACTUAL" ]; then
             echo "::error::Could not read the signing certificate SHA-256 from apksigner (see above)"
             exit 1
           fi
-          if printf '%s\n' "$CERTS" | grep -q "CN=Android Debug"; then
+          if grep -q "CN=Android Debug" <<<"$CERTS"; then
             echo "::error::APK is signed with the debug key"
             exit 1
           fi
@@ -241,19 +269,34 @@ jobs:
             exit 1
           fi
 
-          if "$BUILD_TOOLS/aapt2" dump xmltree --file AndroidManifest.xml "$APK" | grep -q 'debuggable.*=true'; then
+          # Dump to a file first: a failed dump must stop the release, and grep -q on a pipe can
+          # end it early and fail the producer under pipefail, which would skip this check.
+          MANIFEST=$(mktemp)
+          if ! "$BUILD_TOOLS/aapt2" dump xmltree --file AndroidManifest.xml "$APK" > "$MANIFEST"; then
+            echo "::error::Could not read the APK's manifest with aapt2"
+            exit 1
+          fi
+          if ! grep -q 'android:versionCode' "$MANIFEST"; then
+            echo "::error::aapt2's manifest dump looks empty"
+            exit 1
+          fi
+          if grep -q 'debuggable.*=true' "$MANIFEST"; then
             echo "::error::APK is marked debuggable"
             exit 1
           fi
+          rm -f "$MANIFEST"
 
-          # Release builds must carry no endpoint: the placeholder host only appears in the dex if
-          # the release-only blank BuildConfig fields were lost.
+          # No model endpoint, model or key may be compiled in: neither the default placeholder nor
+          # any of the sentinels the build step passed in.
           DEX=$(mktemp -d)
           unzip -q -o "$APK" 'classes*.dex' -d "$DEX"
-          if grep -qa "samosa-ai.example" "$DEX"/classes*.dex; then
-            echo "::error::APK contains the placeholder model endpoint: release builds must compile in blank ones"
-            exit 1
-          fi
+          for s in samosa-ai.example sentinel-samosa-api sentinel-llm-base sentinel-llm-api-key sentinel-llm-model \
+            sentinel-stt-base sentinel-stt-api-key sentinel-stt-model; do
+            if grep -qaF "$s" "$DEX"/classes*.dex; then
+              echo "::error::APK contains '$s': a model endpoint, model or key reached a release build"
+              exit 1
+            fi
+          done
           rm -rf "$DEX"
 
           echo "cert=$ACTUAL" >> "$GITHUB_OUTPUT"
