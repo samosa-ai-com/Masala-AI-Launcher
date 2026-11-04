@@ -5,7 +5,7 @@
     <!-- Uninstall from the long-press menu and uninstall_app (ACTION_DELETE) -->
     <uses-permission android:name="android.permission.REQUEST_DELETE_PACKAGES" />
 
-    <!-- Tools from the private prototype (plan Phase 1, lane B). Every one is on app/manifest-allowlist.txt. -->
+    <!-- Launcher tools (plan Phase 1, lane B). Every one is on app/manifest-allowlist.txt. -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.SET_WALLPAPER" />
     <uses-permission android:name="android.permission.READ_CALENDAR" />

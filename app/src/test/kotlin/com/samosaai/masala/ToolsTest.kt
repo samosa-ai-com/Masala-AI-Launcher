@@ -47,7 +47,7 @@ class ToolsTest {
         FunctionTool(ToolDefinition(name, "", JsonObject(emptyMap())), ToolSensitivity.READ_ONLY) { ActionResult.ok(name) }
 
     @Test
-    fun `the private prototype results map onto core results`() {
+    fun `legacy results map onto core results`() {
         assertEquals(ToolResult.Success("done"), ActionResult.ok("done").toToolResult())
         assertEquals(ToolResult.Failure("no"), ActionResult.error("no").toToolResult())
         assertEquals(
@@ -99,7 +99,7 @@ class ToolsTest {
     }
 
     @Test
-    fun `definitions don't point the model at the private prototype tools Masala left out`() {
+    fun `definitions don't point the model at legacy tools Masala left out`() {
         val leftOut = listOf(
             "call_number", "find_contact", "read_call_log", "list_alarms", "list_timers", "edit_alarm",
             "delete_alarm", "delete_timer", "set_brightness",

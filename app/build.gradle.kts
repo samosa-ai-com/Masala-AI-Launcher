@@ -16,7 +16,7 @@ val localProps = Properties().apply {
 }
 
 /**
- * the private prototype's samosaConfig: endpoints and keys come from an environment variable or `local.properties`
+ * Local config: endpoints and keys come from an environment variable or `local.properties`
  * (both gitignored), never from Git. A checkout without them builds against inert placeholders.
  */
 fun samosaConfig(name: String, placeholder: String): String =

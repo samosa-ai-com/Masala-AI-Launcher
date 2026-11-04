@@ -7,7 +7,7 @@ import androidx.health.connect.client.HealthConnectClient
  * Last known Health Connect grant state.
  *
  * Health Connect only exposes granted permissions through a `suspend` call, but
- * the Settings permission list ([com.example.ui.PermissionItems]) needs a
+ * the Settings permission list needs a
  * synchronous answer to render a row. This caches the most recent result:
  * [refresh] is called from [HealthTool] on every health tool call and from
  * MainActivity after the permission screen returns, so the row is accurate by

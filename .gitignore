@@ -2,14 +2,14 @@
 extracted-apks/
 
 # Upstream launcher sources: only folder placeholders + clone guide are committed.
-# Clone locally on demand (see reference/upstream/README.md). Ignores everything
+# Clone locally on demand. Ignores everything
 # inside each project folder except the .gitkeep placeholder.
 reference/upstream/*/**
 !reference/upstream/*/.gitkeep
 # Guard against future nested clones
 reference/upstream/*/.git/
 
-# APK analysis output: commit docs + metadata only, never the REDACTED bulk
+# APK analysis output: commit docs + metadata only, never the bulk output
 reference/reversed/*/analysis-output/
 reference/reversed/*/analysis-output/
 
@@ -24,3 +24,10 @@ local.properties
 .vscode/
 *.iml
 captures/
+
+# Signing keys and private notes - never commit
+*.jks
+*.keystore
+*.p12
+*.pfx
+docs/handoff/

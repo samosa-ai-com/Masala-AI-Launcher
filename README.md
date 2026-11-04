@@ -1,10 +1,6 @@
 # Masala
 
-An AI home-screen launcher for Android. Start with the docs:
-
-- [`docs/masala-feature-architecture.md`](docs/masala-feature-architecture.md): features, decisions, architecture
-- [`docs/masala-implementation-plan.md`](docs/masala-implementation-plan.md): phases, lanes, risks
-- [`docs/launcher-analysis/`](docs/launcher-analysis/): the 17 launcher reports they draw on
+An AI home-screen launcher for Android. Start with `AGENTS.md` (entry point) and `docs/plans/` (feature notes).
 
 ## Modules
 
@@ -26,7 +22,7 @@ Without an Android SDK, `settings.gradle.kts` builds `core` only.
 
 ## Manifest check and Play readiness report
 
-`build-logic/` holds a Gradle plugin applied to `app` (arch §4, plan 0.4). Before each
+`build-logic/` holds a Gradle plugin applied to `app`. Before each
 `assemble<Variant>` and with `check`, it:
 
 - fails the build if a permission, service, receiver, provider or `<queries>` package in the merged
@@ -39,8 +35,8 @@ Every line in either list needs a reason after `#`.
 
 ## Model endpoint and the debug screen
 
-Model calls go to any OpenAI-compatible endpoint, set in `local.properties` (gitignored; the private prototype's
-`samosaConfig` pattern, environment variables win):
+Model calls go to any OpenAI-compatible endpoint, set in `local.properties` (gitignored,
+following a local-config pattern, environment variables win):
 
 ```properties
 SAMOSA_API_URL=https://…                 # default base URL is $SAMOSA_API_URL/v1/

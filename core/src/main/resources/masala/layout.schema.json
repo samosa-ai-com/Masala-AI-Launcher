@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://example.com/masala/schema/layout-v4.json",
+  "$id": "urn:masala:layout-schema:4",
   "title": "Masala layout, version 4",
   "description": "Kept by hand to match the Kotlin contracts in com.samosaai.masala.core.contract. LayoutSchemaTest keeps them in step. $defs/ModePatch is the mode patch schema.",
   "type": "object",

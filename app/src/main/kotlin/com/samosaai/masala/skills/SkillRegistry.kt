@@ -10,7 +10,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
 
 /**
- * From the private prototype's `SkillRegistry`, on `MasalaSkill`. the private prototype's is a singleton behind `init(context)`;
+ * App-side skill registry for `MasalaSkill`. The earlier prototype kept its registry as a singleton behind `init(context)`;
  * this is an instance that `MasalaApp` owns, so tests can make their own and nothing is global.
  * Bundled skills come from `assets/skills/`, community ones from [CommunitySkillStore].
  */

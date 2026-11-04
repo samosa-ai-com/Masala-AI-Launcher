@@ -31,7 +31,7 @@ sealed class ScheduledStart {
 }
 
 /**
- * Starts the agent run of a scheduled task. the private prototype calls its `ChatRunner` here; Masala's runner is
+ * Starts the agent run of a scheduled task. The earlier prototype called its `ChatRunner` here; Masala's runner is
  * `MasalaAgent`'s skill runner (Phase 4), which reports back through
  * [ScheduledTaskRuns.recordOutcome]. Until then `MasalaApp.taskRunner` is null and tasks are recorded
  * as not started.
@@ -43,7 +43,7 @@ fun interface TaskRunner {
 /**
  * From the private prototype's `ScheduledTaskRuns`. Starts the runs of scheduled tasks and writes down how they went
  * (issue #132). One lock covers both, so a run that ends at once can't have its result written before
- * the record that it started. Without the private prototype's exact-alarm gate: every due task goes to the runner.
+ * the record that it started. Without an exact-alarm gate: every due task goes to the runner.
  */
 class ScheduledTaskRuns(private val app: Application) {
 

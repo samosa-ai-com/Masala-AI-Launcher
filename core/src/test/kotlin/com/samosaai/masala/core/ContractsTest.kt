@@ -44,7 +44,7 @@ class ContractsTest {
         assertFailsWith<SerializationException> { MasalaJson.strict.decodeFromString<LayoutDoc>(json) }
     }
 
-    /** the private prototype's `Skill` fields only. Replace with the private prototype's own class once its code is in the repo. */
+    /** The shared legacy `Skill` fields, for the interop tests below. */
     @Serializable
     data class PrototypeSkill(
         val id: String,
@@ -57,15 +57,15 @@ class ContractsTest {
     )
 
     @Test
-    fun `the private prototype can still read every Masala skill`() {
+    fun `legacy readers can still read every Masala skill`() {
         for (name in Fixtures.skillExamples) {
-            val prototype = MasalaJson.lenient.decodeFromString<PrototypeSkill>(Fixtures.text("skills/$name.json"))
-            assertEquals(Fixtures.skill(name).instructions, prototype.instructions, name)
+            val parsed = MasalaJson.lenient.decodeFromString<PrototypeSkill>(Fixtures.text("skills/$name.json"))
+            assertEquals(Fixtures.skill(name).instructions, parsed.instructions, name)
         }
     }
 
     @Test
-    fun `Masala reads a plain the private prototype skill with defaults`() {
+    fun `Masala reads a plain legacy skill with defaults`() {
         val skill = MasalaJson.lenient.decodeFromString<MasalaSkill>(
             """{"id":"x","title":"X","instructions":"Do x","isVerified":true}""",
         )

@@ -4,7 +4,7 @@ import android.util.Log
 import com.samosaai.masala.BuildConfig
 
 /**
- * From the private prototype's `the private prototypeLog`: `d` is a no-op in release builds. `BuildConfig.DEBUG` folds to a constant
+ * Logging helper: `d` is a no-op in release builds. `BuildConfig.DEBUG` folds to a constant
  * `false` there, and the message is a lambda, so its string is never built either. Raw `Log.w` and
  * `Log.e` stay in use for failures worth reporting from the field.
  */

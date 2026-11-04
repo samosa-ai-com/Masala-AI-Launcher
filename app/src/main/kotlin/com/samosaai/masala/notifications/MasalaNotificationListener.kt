@@ -9,8 +9,8 @@ import kotlinx.coroutines.flow.asStateFlow
 
 /**
  * Notification access, once the user grants it: what NotificationTool reads and dismisses, and the
- * media sessions Android only hands to an enabled listener. From the private prototype's
- * the private prototypeNotificationListenerService without its proactive entity detection and OTP copying. The
+ * media sessions Android only hands to an enabled listener. Adapted from the earlier prototype's
+ * notification listener service, without its proactive entity detection and OTP copying. The
  * count is for the context service (Phase 2) and the quiet-nights urgent filter (Phase 6).
  */
 class MasalaNotificationListener : NotificationListenerService() {

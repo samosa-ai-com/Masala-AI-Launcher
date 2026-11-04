@@ -4,12 +4,12 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 /**
- * the private prototype's `Skill` plus Masala's optional fields (arch §3.9). the private prototype reads skills with
- * `ignoreUnknownKeys = true`, so the extra fields don't break it. Decode with [MasalaJson.lenient].
+ * The shared `Skill` contract plus Masala's optional fields. Legacy readers decode skills with
+ * `ignoreUnknownKeys = true`, so the extra fields don't break them. Decode with [MasalaJson.lenient].
  */
 @Serializable
 data class MasalaSkill(
-    // the private prototype's fields
+    // shared legacy fields
     val id: String,
     val title: String = "",
     val description: String = "",

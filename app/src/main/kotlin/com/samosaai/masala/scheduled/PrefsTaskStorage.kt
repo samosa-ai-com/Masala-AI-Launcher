@@ -4,7 +4,7 @@ import android.content.Context
 import com.samosaai.masala.core.scheduled.TaskStorage
 
 /**
- * Keeps the scheduled tasks in one SharedPreferences string. the private prototype uses encrypted preferences
+ * Keeps the scheduled tasks in one SharedPreferences string. The earlier prototype used encrypted preferences
  * (`SafeEncryptedSharedPreferences`); these are plain app-private preferences, which Android already
  * encrypts at rest, and that library is deprecated.
  */
