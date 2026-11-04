@@ -682,6 +682,10 @@ class MasalaApp : Application() {
             sessions = consults,
             skill = { id -> effectiveSkills().firstOrNull { it.id == id } },
             agentFor = ::consultAgent,
+            timeoutMs = {
+                if (com.samosaai.masala.llm.LlmConfig.default.isOnLocalNetwork) ConsultService.LOCAL_TIMEOUT_MS
+                else ConsultService.TIMEOUT_MS
+            },
         )
     }
 

@@ -19,10 +19,12 @@ import java.io.File
  * Mini-app JS has no keys and no network to the model endpoints. When Masala
  * allows it for an app ([MiniAppStore.mediaAllowed]), the app can call:
  * - `fetch('masala://media/generate?prompt=..&style=..')` → `{ok, ref, dataUrl, message}`
- * - `fetch('masala://media/segment?ref=..&prompt=..')` → `{ok, ref, dataUrl, message}`
+ * - `fetch('masala://media/segment?ref=..&prompt=..')` → `{ok, ref, dataUrl, cutoutRef, cutoutDataUrl, message}`
  * - `fetch('masala://media/speak?text=..')` → `{ok, message}` (plays on host speakers)
  * - `fetch('masala://media/capabilities')` → `{image,edit,segment,speak,transcribe}`
  *
+ * Those URLs are rewritten in the page to the same-origin [PATH] (see [miniAppMediaShim]),
+ * because WebView's fetch never lets a custom scheme reach the interceptor.
  * The host proxies through the same tools chat uses ([GenerateImageTool],
  * [SamSegmentTool], [SpeakTool]); the API key never enters the JS context.
  * [EditImageTool] is intentionally not exposed yet: mini-apps hold no files to
@@ -40,11 +42,29 @@ object MiniAppMediaBridge {
     fun probeDenial(): WebResourceResponse =
         json(200, """{"ok":false,"error":"media not available in preview"}""")
 
-    fun intercept(app: MasalaApp, appId: String, url: String): WebResourceResponse? {        val uri = runCatching { Uri.parse(url) }.getOrNull() ?: return null
-        if (uri.scheme != SCHEME || uri.host != HOST) return null
+    /**
+     * WebView's `fetch` and XHR refuse custom schemes before `shouldInterceptRequest` runs
+     * ("URL scheme "masala" is not supported"), so [miniAppMediaShim] rewrites `masala://media/<op>`
+     * to this same-origin path, which the host intercepts like the documented form.
+     */
+    const val PATH = "/__masala/media/"
+
+    /** True for a bridge call: the documented `masala://media/...` form, or [PATH] on the app's own [host]. */
+    fun isBridgeUrl(url: String, host: String): Boolean {
+        if (url.startsWith("$SCHEME://$HOST/")) return true
+        val uri = runCatching { Uri.parse(url) }.getOrNull() ?: return false
+        return uri.host == host && uri.path.orEmpty().startsWith(PATH)
+    }
+
+    fun intercept(app: MasalaApp, appId: String, url: String): WebResourceResponse? {
+        val uri = runCatching { Uri.parse(url) }.getOrNull() ?: return null
+        val op = when {
+            uri.scheme == SCHEME && uri.host == HOST -> uri.pathSegments.firstOrNull().orEmpty()
+            uri.path.orEmpty().startsWith(PATH) -> uri.path.orEmpty().removePrefix(PATH).substringBefore('/')
+            else -> return null
+        }
         val allowed = runBlocking { runCatching { app.miniApps.mediaAllowed(appId) }.getOrDefault(false) }
         if (!allowed) return json(403, """{"ok":false,"error":"media not allowed for this app"}""")
-        val op = uri.pathSegments.firstOrNull().orEmpty()
         return when (op) {
             "capabilities" -> json(200, """{"ok":true,"image":true,"edit":false,"segment":true,"speak":true,"transcribe":false}""")
             "generate" -> generate(app, uri.getQueryParameter("prompt").orEmpty(), uri.getQueryParameter("style"))
@@ -78,7 +98,15 @@ object MiniAppMediaBridge {
         if (!result.success) return json(502, """{"ok":false,"error":${jsonStr(result.message.take(300))}}""")
         val annotated = result.produced.firstOrNull { it.kind == "segmentation" }?.ref.orEmpty()
         val dataUrl = runCatching { thumbDataUrl(annotated) }.getOrNull().orEmpty()
-        return json(200, """{"ok":true,"ref":${jsonStr(annotated)},"dataUrl":${jsonStr(dataUrl)},"message":${jsonStr(result.message.take(500))}}""")
+        // The transparent cut-out of the first object, kept PNG so a sticker app gets real transparency
+        // (the overlay alone made "stickers" that were the whole photo with a tint).
+        val cutout = result.produced.firstOrNull { it.kind == "image" && it.title.startsWith("cutout") }?.ref.orEmpty()
+        val cutoutUrl = runCatching { thumbDataUrl(cutout, png = true) }.getOrNull().orEmpty()
+        // Nothing found: say so, instead of an "ok" with the untouched picture (apps showed it as the sticker).
+        if (cutoutUrl.isEmpty()) {
+            return json(404, """{"ok":false,"error":${jsonStr("Couldn't find '${prompt.take(60)}' in the picture. Try another word for the main thing in it.")}}""")
+        }
+        return json(200, """{"ok":true,"ref":${jsonStr(annotated)},"dataUrl":${jsonStr(dataUrl)},"cutoutRef":${jsonStr(cutout)},"cutoutDataUrl":${jsonStr(cutoutUrl)},"message":${jsonStr(result.message.take(500))}}""")
     }
 
     private fun speak(app: MasalaApp, text: String): WebResourceResponse {
@@ -103,7 +131,7 @@ object MiniAppMediaBridge {
         return runCatching { f.canonicalPath.startsWith(base) && f.exists() }.getOrDefault(false)
     }
 
-    private fun thumbDataUrl(path: String): String {
+    private fun thumbDataUrl(path: String, png: Boolean = false): String {
         val f = File(path)
         if (!f.exists()) return ""
         val opts = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
@@ -114,9 +142,11 @@ object MiniAppMediaBridge {
         val bmp = android.graphics.BitmapFactory.decodeFile(f.absolutePath, android.graphics.BitmapFactory.Options().apply { inSampleSize = sample })
             ?: return ""
         val bos = java.io.ByteArrayOutputStream()
-        bmp.compress(android.graphics.Bitmap.CompressFormat.JPEG, 72, bos)
+        if (png) bmp.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, bos)
+        else bmp.compress(android.graphics.Bitmap.CompressFormat.JPEG, 72, bos)
         if (!bmp.isRecycled()) bmp.recycle()
-        return "data:image/jpeg;base64," + android.util.Base64.encodeToString(bos.toByteArray(), android.util.Base64.NO_WRAP)
+        val mime = if (png) "image/png" else "image/jpeg"
+        return "data:$mime;base64," + android.util.Base64.encodeToString(bos.toByteArray(), android.util.Base64.NO_WRAP)
     }
 
     private fun json(status: Int, body: String): WebResourceResponse =

@@ -204,6 +204,34 @@ internal const val miniAppNoWebRtc = """
 """
 
 /**
+ * Points `masala://media/...` requests at the same-origin [MiniAppMediaBridge.PATH]. WebView's fetch
+ * and XHR reject a custom scheme before the request reaches `shouldInterceptRequest`, so without this
+ * every media call fails with "Failed to fetch". Generated apps keep using the documented form.
+ */
+internal val miniAppMediaShim = """
+(function () {
+  var P = '${MiniAppMediaBridge.SCHEME}://${MiniAppMediaBridge.HOST}/', T = '${MiniAppMediaBridge.PATH}';
+  function fix(u) { return (typeof u === 'string' && u.indexOf(P) === 0) ? T + u.slice(P.length) : u; }
+  var f = window.fetch;
+  if (f) window.fetch = function (input, init) {
+    if (typeof input === 'string') input = fix(input);
+    else if (input && typeof input.href === 'string' && input.href.indexOf(P) === 0) input = fix(input.href);
+    else if (input && typeof input.url === 'string' && input.url.indexOf(P) === 0) input = new Request(fix(input.url), input);
+    return f.call(this, input, init);
+  };
+  var X = window.XMLHttpRequest && window.XMLHttpRequest.prototype;
+  if (X && X.open) {
+    var open = X.open;
+    X.open = function () {
+      var a = Array.prototype.slice.call(arguments);
+      if (a.length > 1 && a[1] != null) a[1] = fix(String(a[1]));
+      return open.apply(this, a);
+    };
+  }
+})();
+"""
+
+/**
  * Sets [wv] up as the host for one app and loads it: the stored [html] is served as the app's own
  * origin, nothing else from the app is reachable, and navigation never leaves the app. Without
  * [networkAllowed] every other request is refused, a CSP stops WebSockets and WebRTC is removed.
@@ -223,17 +251,18 @@ internal fun hostMiniApp(
     val blockedHosts = java.util.Collections.synchronizedSet(mutableSetOf<String>())
     applyMiniAppSettings(wv, networkAllowed)
     var document = html
-    if (!networkAllowed) {
-        if (WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) {
-            // Every frame: this WebView only ever shows this one app.
-            WebViewCompat.addDocumentStartJavaScript(wv, miniAppNoWebRtc, setOf("*"))
-        } else {
-            // Older WebView: the main frame only, before any of the app's own script. After the
-            // doctype, or the page would render in quirks mode.
-            val doctype = Regex("^\\s*<!doctype[^>]*>", RegexOption.IGNORE_CASE).find(html)?.value.orEmpty()
-            document = "$doctype<script>$miniAppNoWebRtc</script>${html.substring(doctype.length)}"
-        }
+    // WebRTC removal (network off) first, then the media shim (always).
+    val startScripts = listOfNotNull(miniAppNoWebRtc.takeIf { !networkAllowed }, miniAppMediaShim)
+    if (WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) {
+        // Every frame: this WebView only ever shows this one app.
+        startScripts.forEach { WebViewCompat.addDocumentStartJavaScript(wv, it, setOf("*")) }
+    } else {
+        // Older WebView: the main frame only, before any of the app's own script. After the
+        // doctype, or the page would render in quirks mode.
+        val doctype = Regex("^\\s*<!doctype[^>]*>", RegexOption.IGNORE_CASE).find(html)?.value.orEmpty()
+        document = doctype + startScripts.joinToString("") { "<script>$it</script>" } + html.substring(doctype.length)
     }
+    val originHost = android.net.Uri.parse(origin).host.orEmpty()
     val htmlBytes = document.toByteArray(Charsets.UTF_8)
     val headers = if (networkAllowed) emptyMap() else mapOf("Content-Security-Policy" to miniAppOfflineCsp)
     wv.webViewClient = object : WebViewClient() {
@@ -242,7 +271,7 @@ internal fun hostMiniApp(
             // Mediated media bridge first: keys never enter JS, per-app opt-in. The probe
             // (no app) gets a clean JSON denial, not the offline 403, so working media
             // calls don't look like errors to the repair turn.
-            if (url.startsWith("${MiniAppMediaBridge.SCHEME}://${MiniAppMediaBridge.HOST}/")) {
+            if (MiniAppMediaBridge.isBridgeUrl(url, originHost)) {
                 if (app == null) return MiniAppMediaBridge.probeDenial()
                 runCatching { MiniAppMediaBridge.intercept(app, appId, url) }.getOrNull()?.let { return it }
             }

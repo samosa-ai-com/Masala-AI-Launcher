@@ -19,6 +19,12 @@ import java.util.concurrent.TimeUnit
 /** the private prototype's default API timeout. */
 const val DEFAULT_API_TIMEOUT_SECONDS = 180L
 
+/**
+ * For a model on the user's own network. Replies aren't streamed, so the read timeout spans the whole
+ * reply: a local 30B model writing a mini app (tool call with the full HTML) passed 180 s and was cut off.
+ */
+const val LOCAL_API_TIMEOUT_SECONDS = 900L
+
 /** Longest a connection to the model server may take to open, however long the API timeout is. */
 private const val MAX_CONNECT_TIMEOUT_SECONDS = 15L
 

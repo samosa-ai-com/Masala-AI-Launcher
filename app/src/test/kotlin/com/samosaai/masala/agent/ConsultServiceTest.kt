@@ -242,6 +242,12 @@ class ConsultServiceTest {
         val answered = service.consult("chat-1", "doctor", "make me a snake game", null)
             as ConsultService.Outcome.Answered
         assertEquals(listOf(com.samosaai.masala.core.tool.Produced("mini_app", "Snake", "a1")), answered.produced)
+        // The main agent reads only the text: it must learn the app exists, or a follow-up rebuilds it.
+        assertTrue(answered.text.contains("Already saved in this consult"))
+        assertTrue(answered.text.contains("mini_app 'Snake' id a1"))
+        // A continued consult replays the saved answer, so the expert knows too.
+        val replayed = ConsultSessions(tmp.root).get("chat-1", answered.session.id)!!.pairs().last().second
+        assertTrue(replayed.contains("id a1"))
     }
 
     @Test

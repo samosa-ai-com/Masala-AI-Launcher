@@ -37,6 +37,9 @@ class NameCorrector(names: Collection<String>) {
         val (best, bestDistance) = scored.first()
         if (bestDistance == 0 || bestDistance > allowed(best.key.length)) return null
         if (best.key.first() != key.first()) return null
+        // "note" against the Notes app, "photo" against Photos: a plural or possessive of the name is
+        // an ordinary word the user said, not a mis-hearing of the app.
+        if (inflectionOf(key, best.key)) return null
         if (scored.size > 1 && scored[1].second <= bestDistance) return null
         val trailing = window.last().takeLastWhile { !it.isLetterOrDigit() }
         return best.display + trailing to n
@@ -53,6 +56,12 @@ class NameCorrector(names: Collection<String>) {
         const val MAX_WORDS = 3
 
         fun key(text: String) = text.lowercase().filter { it.isLetterOrDigit() }
+
+        /** True when one key is the other plus a plural/possessive ending ("note"/"notes", "file"/"files"). */
+        fun inflectionOf(a: String, b: String): Boolean {
+            val (short, long) = if (a.length <= b.length) a to b else b to a
+            return long.startsWith(short) && long.removePrefix(short) in setOf("s", "es")
+        }
 
         /** Damerau–Levenshtein distance (adjacent swaps count once). */
         fun distance(a: String, b: String): Int {

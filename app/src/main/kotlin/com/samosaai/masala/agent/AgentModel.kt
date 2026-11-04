@@ -38,4 +38,16 @@ class LlmAgentModel(
 }
 
 internal fun com.samosaai.masala.core.tool.ToolDefinition.toLlm() =
-    ToolDefinition(function = FunctionDefinition(name, description, parameters))
+    ToolDefinition(function = FunctionDefinition(name, description, withProperties(parameters)))
+
+/**
+ * An object schema always carries `properties`, `{}` for a tool with no arguments. Hosted APIs accept
+ * a bare `{"type":"object"}`, but LM Studio rejects the whole request (HTTP 400, "properties
+ * Required"), so one argument-free tool broke every chat on a self-hosted model.
+ */
+internal fun withProperties(parameters: kotlinx.serialization.json.JsonObject): kotlinx.serialization.json.JsonObject =
+    if (parameters["type"]?.toString()?.trim('"') == "object" && "properties" !in parameters) {
+        kotlinx.serialization.json.JsonObject(parameters + ("properties" to kotlinx.serialization.json.JsonObject(emptyMap())))
+    } else {
+        parameters
+    }

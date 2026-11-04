@@ -23,7 +23,8 @@ class ConsultService(
     private val sessions: ConsultSessions,
     private val skill: (String) -> MasalaSkill?,
     private val agentFor: (MasalaSkill) -> MasalaAgent,
-    private val timeoutMs: Long = TIMEOUT_MS,
+    /** Read per consult: a model on the user's own network gets [LOCAL_TIMEOUT_MS]. */
+    private val timeoutMs: () -> Long = { TIMEOUT_MS },
 ) {
     sealed interface Outcome {
         /** [text] is what the main agent receives: the answer plus where it came from. */
@@ -93,7 +94,7 @@ class ConsultService(
             var missingAccess: String? = null
             val produced = mutableListOf<com.samosaai.masala.core.tool.Produced>()
             try {
-                val finished = withTimeoutOrNull(timeoutMs) {
+                val finished = withTimeoutOrNull(timeoutMs()) {
                     agent.run(ChatMessage("user", JsonPrimitive(asked))).collect { event ->
                         when (event) {
                             is AgentEvent.Done -> answer = event.text.ifBlank { null }
@@ -119,8 +120,11 @@ class ConsultService(
                 failure = e.message ?: e::class.java.simpleName
             }
 
-            val text = answer
-            val reason = failure ?: "It didn't answer."
+            // What the expert saved goes into the text the main agent reads and the consult replays:
+            // `produced` alone only reaches the chat UI, so a follow-up consult rebuilt the same app.
+            val made = producedNote(produced)
+            val text = answer?.let { if (made.isEmpty()) it else it.trimEnd() + "\n\n" + made }
+            val reason = (failure ?: "It didn't answer.") + if (made.isEmpty()) "" else " $made"
             // One write: the question and its outcome land together or not at all.
             val turns = if (text != null) {
                 listOf(ConsultTurn(TurnRole.USER, asked), ConsultTurn(TurnRole.MASALA, text))
@@ -196,10 +200,29 @@ class ConsultService(
         }.trimEnd()
     }
 
+    /** One line naming what the consult saved, with ids, so nobody creates it a second time. */
+    internal fun producedNote(produced: List<com.samosaai.masala.core.tool.Produced>): String =
+        if (produced.isEmpty()) {
+            ""
+        } else {
+            "Already saved in this consult (don't create again; change it by id): " +
+                produced.joinToString("; ") { "${it.kind} '${it.title}' id ${it.ref}" } + "."
+        }
+
     private fun oneLine(text: String) = text.replace('\n', ' ').replace(Regex("\\s+"), " ").trim().take(60)
 
     companion object {
-        /** Long enough for a slow model, short enough that a stuck expert can't hold the turn. */
-        const val TIMEOUT_MS = 90_000L
+        /**
+         * Long enough for a slow model, short enough that a stuck expert can't hold the turn. An app
+         * build writes a whole single-file app in one model call; at 90 s the first software-engineer
+         * consult timed out on every build on the phone, and the retry rebuilt it from scratch.
+         */
+        const val TIMEOUT_MS = 180_000L
+
+        /**
+         * A model on the user's own computer (LM Studio, Ollama) re-reads the ~20k-token prompt on every
+         * step and writes an app at local speed: one app build there took longer than [TIMEOUT_MS].
+         */
+        const val LOCAL_TIMEOUT_MS = 900_000L
     }
 }

@@ -82,12 +82,13 @@ internal fun hostBundledMiniApp(
         .build()
     if (WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) {
         WebViewCompat.addDocumentStartJavaScript(wv, miniAppNoWebRtc, setOf("*"))
+        WebViewCompat.addDocumentStartJavaScript(wv, miniAppMediaShim, setOf("*"))
     }
     wv.webViewClient = object : WebViewClient() {
         override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse? {
             val url = request.url.toString()
             // Mediated media bridge first, same rules as a user app: denied unless allowed.
-            if (url.startsWith("${MiniAppMediaBridge.SCHEME}://${MiniAppMediaBridge.HOST}/")) {
+            if (MiniAppMediaBridge.isBridgeUrl(url, domain)) {
                 if (masalaApp == null) return MiniAppMediaBridge.probeDenial()
                 return runCatching { MiniAppMediaBridge.intercept(masalaApp, app.id, url) }.getOrNull()
             }

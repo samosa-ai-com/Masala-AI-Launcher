@@ -71,4 +71,30 @@ object Cutout {
         }
         return out
     }
+
+    /** Pixels, width and height of a cut-out trimmed to its visible pixels. */
+    class Cropped(val pixels: IntArray, val width: Int, val height: Int)
+
+    /**
+     * Trims [argb] to the bounding box of its non-transparent pixels plus [pad] (clamped to the image),
+     * so a cut-out shows the object rather than the object in a corner of an empty photo-sized frame.
+     * Null when nothing is visible.
+     */
+    fun cropToContent(argb: IntArray, w: Int, h: Int, pad: Int = 8): Cropped? {
+        require(argb.size == w * h) { "pixel count mismatch" }
+        var minX = w; var minY = h; var maxX = -1; var maxY = -1
+        for (y in 0 until h) for (x in 0 until w) {
+            if ((argb[y * w + x] ushr 24) and 0xFF != 0) {
+                if (x < minX) minX = x; if (x > maxX) maxX = x
+                if (y < minY) minY = y; if (y > maxY) maxY = y
+            }
+        }
+        if (maxX < 0) return null
+        val l = (minX - pad).coerceAtLeast(0); val t = (minY - pad).coerceAtLeast(0)
+        val r = (maxX + pad).coerceAtMost(w - 1); val b = (maxY + pad).coerceAtMost(h - 1)
+        val cw = r - l + 1; val ch = b - t + 1
+        val out = IntArray(cw * ch)
+        for (y in 0 until ch) System.arraycopy(argb, (t + y) * w + l, out, y * cw, cw)
+        return Cropped(out, cw, ch)
+    }
 }

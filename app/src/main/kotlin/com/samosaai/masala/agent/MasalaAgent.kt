@@ -238,6 +238,7 @@ class MasalaAgent(
             is ToolResult.NeedsCapability ->
                 "Not run: ${result.reason} This needs ${result.capability} from the user, which is not granted. " +
                     "Do not call it again. Finish your answer and say what they have to grant."
+            is ToolResult.Success -> result.asText() + shownNote(result.results())
             else -> result.asText()
         }
         // The transcript keeps the full output on purpose (a skill's saved run is a record);
@@ -245,6 +246,20 @@ class MasalaAgent(
         // the wire, not by silently losing data the user may need to reopen.
         return ChatMessage("tool", JsonPrimitive(raw), toolCallId = callId)
     }
+
+    /**
+     * The chat already shows a tool's results (images, masks, cut-outs, videos, apps) as cards. Without
+     * saying so, a model that got "Overlay saved." went looking for the files and read the pictures back
+     * as base64 until the request was too large to send.
+     */
+    internal fun shownNote(results: List<com.samosaai.masala.core.tool.Produced>): String =
+        if (results.isEmpty()) {
+            ""
+        } else {
+            "\nAlready shown to the user as cards: " +
+                results.joinToString("; ") { "${it.kind} '${it.title}' (${it.ref})" } +
+                ". Don't read or list them to show them again; describe what was found and finish."
+        }
 
     /**
      * An image a tool read. [summary] is the text that goes into the tool message; [data] rides as

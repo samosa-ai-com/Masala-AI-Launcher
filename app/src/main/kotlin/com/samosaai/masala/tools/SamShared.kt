@@ -257,6 +257,23 @@ internal object SamShared {
     /** Frames a [quality] render may use; kept for callers that only know the budget. */
     fun maxFramesFor(quality: VideoQuality): Int = quality.maxFrames
 
+    /**
+     * Why a clip has too many source frames, or null when it fits. SAM 3.1 answers with every source
+     * frame (a 6 s, 120 fps phone clip came back as 720 frames, 10.8 MB), and handling that got Masala
+     * killed for memory on the phone. [frameCount] null (unknown) passes.
+     */
+    fun tooManyFrames(frameCount: Int?, durationMs: Long): String? {
+        if (frameCount == null || frameCount <= MAX_SOURCE_FRAMES) return null
+        val fps = if (durationMs > 0) (frameCount * 1000L / durationMs).toInt().coerceAtLeast(1) else 0
+        val fitSeconds = if (fps > 0) (MAX_SOURCE_FRAMES / fps).coerceAtLeast(1) else 0
+        return "That clip has $frameCount frames" + (if (fps > 0) " (${fps} fps)" else "") + ". SAM tracks every " +
+            "frame, so clips are limited to $MAX_SOURCE_FRAMES frames" +
+            (if (fitSeconds > 0) ": trim it to about ${fitSeconds}s with media_edit" else "") +
+            ", or record at 30 fps."
+    }
+
+    const val MAX_SOURCE_FRAMES = 300
+
     /** Why a clip was refused, or null when it fits the cap. */
     fun clipTooLong(durationMs: Long): String? {
         if (durationMs <= MAX_CLIP_SECONDS * 1000L) return null

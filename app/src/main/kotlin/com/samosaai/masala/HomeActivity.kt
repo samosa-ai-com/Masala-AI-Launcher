@@ -779,7 +779,16 @@ class HomeActivity : ComponentActivity() {
                         onSearch = {
                             if (resumable) openSession(activeId) else { drawerOpen = true; searchRequests++ }
                         },
-                        mic = rememberMicTap(app),
+                        // A minimized chat that is still working can't take a new take; the mic
+                        // brings that chat back instead, like the chat button does.
+                        mic = rememberMicTap(app).let { talk ->
+                            {
+                                val live = app.commands.state.value.let {
+                                    it is CommandState.Thinking || it == CommandState.Listening || it == CommandState.ListeningPaused
+                                }
+                                if (pillMinimized && live) openSession(activeId) else talk()
+                            }
+                        },
                         level = { pillLevel },
                         onOpenChat = if (resumable) ({ openSession(activeId) }) else ({
                             if (app.commands.busy.value) {

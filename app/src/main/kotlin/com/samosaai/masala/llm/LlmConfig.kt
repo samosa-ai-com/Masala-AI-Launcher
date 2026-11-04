@@ -11,7 +11,18 @@ import com.samosaai.masala.BuildConfig
 data class LlmConfig(val baseUrl: String, val apiKey: String, val model: String) {
     val isConfigured get() = baseUrl.isNotBlank() && model.isNotBlank()
 
-    fun client(context: Context) = LLMClient(apiKey = apiKey, baseUrl = baseUrl, model = model, context = context)
+    /** A server on the user's own network (LM Studio, Ollama): slower than a cloud API, so it waits longer. */
+    val isOnLocalNetwork: Boolean
+        get() = runCatching { java.net.URI(baseUrl).host }.getOrNull()
+            ?.let { com.samosaai.masala.connectors.mcp.isLocalHost(it) } ?: false
+
+    fun client(context: Context) = LLMClient(
+        apiKey = apiKey,
+        baseUrl = baseUrl,
+        model = model,
+        context = context,
+        apiTimeoutSeconds = if (isOnLocalNetwork) LOCAL_API_TIMEOUT_SECONDS else DEFAULT_API_TIMEOUT_SECONDS,
+    )
 
     companion object {
         /** From `local.properties`, compiled in (decision 8); the store's first-run seed. */
