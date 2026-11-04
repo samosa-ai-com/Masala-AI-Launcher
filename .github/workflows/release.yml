@@ -3,8 +3,8 @@ name: Release
 # Publishes a signed APK as a GitHub release. To cut one: bump versionCode and versionName in
 # app/build.gradle.kts, write the notes under "## [Unreleased]" in CHANGELOG.md, and push to main.
 # This workflow then runs CI's checks, builds and verifies the signed release APK, tags v<versionName>,
-# publishes the release with the APK attached, and commits CHANGELOG.md with the Unreleased section
-# renamed to the version.
+# publishes the release with the APK attached, and commits update.json (what release builds read to
+# offer the update in-app) and CHANGELOG.md with the Unreleased section renamed to the version.
 #
 # A push to main that touches app/build.gradle.kts without a version bump finds the tag already
 # published and does nothing. Run it by hand (Actions -> Release -> Run workflow) with dry_run on to
@@ -66,6 +66,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ steps.version.outputs.tag }}
           ASSET: ${{ steps.version.outputs.asset }}
+          NAME: ${{ steps.version.outputs.name }}
         run: |
           DRY_RUN=false
           if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.dry_run }}" = "true" ]; then
@@ -92,15 +93,27 @@ jobs:
           fi
 
           # A run that died after "Create tag" also leaves the tag behind. Only treat the tag as
-          # "nothing to do" once the release and its APK are really there.
-          ASSETS=$(gh release view "$TAG" --json assets --jq '.assets[].name' 2>/dev/null || true)
-          if printf '%s\n' "$ASSETS" | grep -qxF "$ASSET"; then
-            echo "$TAG is already published with $ASSET: nothing to do."
-            echo "should_release=false" >> "$GITHUB_OUTPUT"
-            exit 0
+          # "nothing to do" once the release, its APK and the update.json phones read are all there.
+          RECOVER="Recover with: gh release delete $TAG --yes; git push --delete origin $TAG — then re-run this workflow."
+          ASSETS=$(gh release view "$TAG" --json assets --jq '.assets[] | "\(.name) \(.digest // "")"' 2>/dev/null || true)
+          LINE=$(printf '%s\n' "$ASSETS" | awk -v a="$ASSET" '$1 == a' | head -n1)
+          if [ -z "$LINE" ]; then
+            echo "::error::$TAG is tagged but has no release carrying $ASSET. $RECOVER"
+            exit 1
           fi
-          echo "::error::$TAG is tagged but has no release carrying $ASSET. Recover with: gh release delete $TAG --yes; git push --delete origin $TAG — then re-run this workflow."
-          exit 1
+          ASSET_SHA=$(printf '%s' "$LINE" | awk '{print $2}' | sed 's/^sha256://')
+          MANIFEST_NAME=$(jq -r '.versionName // ""' update.json 2>/dev/null || true)
+          MANIFEST_SHA=$(jq -r '.sha256 // ""' update.json 2>/dev/null || true)
+          if [ "$MANIFEST_NAME" != "$NAME" ]; then
+            echo "::error::$TAG is published but update.json advertises '${MANIFEST_NAME:-nothing}', so phones won't see it. $RECOVER"
+            exit 1
+          fi
+          if [ -n "$ASSET_SHA" ] && [ "$ASSET_SHA" != "$MANIFEST_SHA" ]; then
+            echo "::error::update.json's sha256 ($MANIFEST_SHA) doesn't match the published $ASSET ($ASSET_SHA): phones would reject the download. $RECOVER"
+            exit 1
+          fi
+          echo "$TAG is already published and update.json points at it: nothing to do."
+          echo "should_release=false" >> "$GITHUB_OUTPUT"
 
       - name: Take release notes from CHANGELOG.md
         if: steps.check.outputs.should_release == 'true'
@@ -132,6 +145,8 @@ jobs:
               body = "_(dry run: the Unreleased section is empty)_"
 
           open("release_notes.md", "w", encoding="utf-8").write(body + "\n")
+          # The release page gets an install footer; update.json carries the notes alone.
+          open("update_notes.md", "w", encoding="utf-8").write(body + "\n")
           if not dry_run:
               rolled = text[:unreleased.start()] + f"## [Unreleased]\n\n## [{version}]" + text[unreleased.end():]
               open(path, "w", encoding="utf-8").write(rolled)
@@ -296,17 +311,38 @@ jobs:
           fi
           rm -f "$ASSET" published.apk
 
+      # What release builds read to offer the update (core/.../update/AppUpdates.kt). The sha256 is
+      # the verified APK's, which the release step confirmed is what GitHub serves.
+      - name: Write update.json
+        if: steps.check.outputs.should_release == 'true'
+        env:
+          CODE: ${{ steps.version.outputs.code }}
+          NAME: ${{ steps.version.outputs.name }}
+          TAG: ${{ steps.version.outputs.tag }}
+          ASSET: ${{ steps.version.outputs.asset }}
+          APK_SHA256: ${{ steps.verify.outputs.sha256 }}
+        run: |
+          jq -n \
+            --argjson versionCode "$CODE" \
+            --arg versionName "$NAME" \
+            --arg downloadUrl "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/download/$TAG/$ASSET" \
+            --arg sha256 "$APK_SHA256" \
+            --rawfile releaseNotes update_notes.md \
+            '{versionCode: $versionCode, versionName: $versionName, downloadUrl: $downloadUrl, sha256: $sha256, releaseNotes: ($releaseNotes | rtrimstr("\n"))}' \
+            > update.json
+          cat update.json
+
       # main takes direct pushes today. Pushes made with GITHUB_TOKEN don't trigger workflows, so
       # this commit doesn't re-run CI or this release. If main gets a ruleset requiring PRs, open a
-      # PR here instead.
-      - name: Commit the rolled CHANGELOG.md
+      # PR here instead. Phones see the update once this lands.
+      - name: Commit update.json and the rolled CHANGELOG.md
         if: steps.check.outputs.should_release == 'true' && steps.check.outputs.dry_run != 'true'
         env:
           TAG: ${{ steps.version.outputs.tag }}
         run: |
-          rm -f release_notes.md
-          git add CHANGELOG.md
-          git commit -m "Changelog for $TAG"
+          rm -f release_notes.md update_notes.md
+          git add CHANGELOG.md update.json
+          git commit -m "Release $TAG: update.json and changelog"
           git pull --rebase origin main
           git push origin HEAD:main
 
