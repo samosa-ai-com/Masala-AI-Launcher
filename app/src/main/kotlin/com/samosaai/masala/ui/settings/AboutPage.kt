@@ -29,6 +29,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -113,13 +114,19 @@ private fun UpdatesCard() {
         var ui by remember { mutableStateOf<UpdateUi>(UpdateUi.Checking) }
         var notify by remember { mutableStateOf(prefs.notify) }
         var check by remember { mutableStateOf(0) }
+        // Re-read on every resume: the user grants "install unknown apps" in Android's screen and comes back.
+        var canInstall by remember { mutableStateOf(ProTools.canInstallApps(context)) }
+        LifecycleResumeEffect(Unit) {
+            canInstall = ProTools.canInstallApps(context)
+            onPauseOrDispose { }
+        }
         LaunchedEffect(check) {
             ui = UpdateUi.Checking
             ui = UpdateUi.Checked(checker.check())
         }
 
         fun install(manifest: UpdateManifest) {
-            if (!ProTools.canInstallApps(context)) {
+            if (!canInstall) {
                 context.startActivity(ProTools.installPermissionIntent(context))
                 return
             }
@@ -172,11 +179,11 @@ private fun UpdatesCard() {
                         if (s is UpdateUi.Failed) {
                             Text(stringResource(R.string.update_failed, s.reason), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
                         }
-                        if (!ProTools.canInstallApps(context)) {
+                        if (!canInstall) {
                             Text(stringResource(R.string.update_allow_installs_summary), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                         Button(onClick = { install(manifest) }, modifier = Modifier.fillMaxWidth()) {
-                            Text(stringResource(if (ProTools.canInstallApps(context)) R.string.update_install else R.string.update_allow_installs))
+                            Text(stringResource(if (canInstall) R.string.update_install else R.string.update_allow_installs))
                         }
                     }
                 }
