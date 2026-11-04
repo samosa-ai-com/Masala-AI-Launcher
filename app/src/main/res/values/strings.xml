@@ -196,7 +196,7 @@
     <string name="generate_undo">Undo</string>
     <string name="generate_retry">Retry</string>
     <string name="generate_preview_only">Preview only — apply it first</string>
-    <string name="generate_not_configured">No model configured. Add MASALA_LLM_* to local.properties and rebuild, or set them in Settings → Debug.</string>
+    <string name="generate_not_configured">No model set up yet. Choose a provider and enter your key in Settings → Models &amp; keys.</string>
     <string name="generate_failed">The model did not answer. Check the endpoint and retry.</string>
     <string name="generate_rejected_title">The model needs another try</string>
     <string name="generate_applied">Applied — see it on home</string>
