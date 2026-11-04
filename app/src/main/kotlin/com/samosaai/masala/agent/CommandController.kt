@@ -40,6 +40,8 @@ class CommandController(
     private val newAgent: () -> MasalaAgent,
     private val speech: SpeechInput? = null,
     private val speechStrings: SpeechStrings = SpeechStrings("", ""),
+    /** What a turn says when no model is set up (localized by the caller). */
+    private val notConfiguredText: String = com.samosaai.masala.llm.NOT_CONFIGURED_MESSAGE,
     /**
      * Turns a long conversation into a short summary the model can keep in its context
      * once the history outgrows the budget; null means compaction is off.
@@ -313,7 +315,7 @@ class CommandController(
             } catch (e: Throwable) {
                 // Logging must never be the thing that fails: JVM tests don't mock android.util.Log.
                 runCatching { android.util.Log.e("CommandController", "turn failed", e) }
-                publish(CommandState.Error(transcript, friendlyTurnError(e), steps = turnSteps))
+                publish(CommandState.Error(transcript, friendlyTurnError(e, notConfiguredText), steps = turnSteps))
             }
         }
     }
@@ -619,7 +621,8 @@ private const val STOPPED_NOTE = "Stopped. This is what it had done so far."
  * A failure that isn't a model status line: name the step-free case plainly, otherwise keep the
  * server's words so the user can act on them.
  */
-internal fun friendlyTurnError(error: Throwable): String {
+internal fun friendlyTurnError(error: Throwable, notConfiguredText: String = com.samosaai.masala.llm.NOT_CONFIGURED_MESSAGE): String {
+    if (error is com.samosaai.masala.llm.ModelNotConfiguredException) return notConfiguredText
     if (error is java.io.IOException) {
         return "The connection dropped while working on that. Check the network and try again."
     }

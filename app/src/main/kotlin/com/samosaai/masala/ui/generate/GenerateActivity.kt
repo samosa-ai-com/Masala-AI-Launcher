@@ -149,7 +149,7 @@ class GenerateActivity : ComponentActivity() {
                 appliedLabel = null
                 val config = loadConfig()
                 if (!config.isConfigured) {
-                    phase = Phase.Failed(getString(R.string.generate_not_configured))
+                    phase = Phase.Failed(getString(R.string.model_not_configured))
                     return@launch
                 }
                 phase = try {

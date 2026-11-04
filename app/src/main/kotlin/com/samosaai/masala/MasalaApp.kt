@@ -492,6 +492,7 @@ class MasalaApp : Application() {
             run = { dispatcher.dispatch(it, NoScreen) },
             skills = { skills.getAllSkills() },
             newAgent = { agent(LlmAgentModel(LlmConfig.default.client(this))) },
+            notConfiguredText = getString(R.string.model_not_configured),
             speech = ConfiguredSpeechInput(
                 stt,
                 { SpeechConfig.default },

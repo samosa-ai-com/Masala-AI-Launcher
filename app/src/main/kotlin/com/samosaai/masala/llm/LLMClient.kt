@@ -19,8 +19,14 @@ import java.util.concurrent.TimeUnit
 /** the private prototype's default API timeout. */
 const val DEFAULT_API_TIMEOUT_SECONDS = 180L
 
-/** Shown when no model endpoint is set (every fresh install of a release build). */
+/**
+ * English fallback for [ModelNotConfiguredException]; screens show `R.string.model_not_configured`
+ * instead (chat through `CommandController`, the layout generator directly).
+ */
 const val NOT_CONFIGURED_MESSAGE = "No model set up yet. Choose a provider and enter your key in Settings → Models & keys."
+
+/** No model endpoint is set: every fresh install of a release build until the user picks a provider. */
+class ModelNotConfiguredException : IllegalArgumentException(NOT_CONFIGURED_MESSAGE)
 
 /**
  * For a model on the user's own network. Replies aren't streamed, so the read timeout spans the whole
@@ -79,7 +85,7 @@ class LLMClient(
     init {
         // Release builds ship no endpoint, so a fresh install reaches here with a blank one. Say what
         // to do instead of OkHttp's "Expected URL scheme" error.
-        require(baseUrl.isNotBlank()) { NOT_CONFIGURED_MESSAGE }
+        if (baseUrl.isBlank()) throw ModelNotConfiguredException()
 
         val logging = HttpLoggingInterceptor().apply {
             // BODY tracing writes full prompts/replies to logcat — never in release.
