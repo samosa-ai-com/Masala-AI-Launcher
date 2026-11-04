@@ -102,6 +102,10 @@ object MiniAppMediaBridge {
         // (the overlay alone made "stickers" that were the whole photo with a tint).
         val cutout = result.produced.firstOrNull { it.kind == "image" && it.title.startsWith("cutout") }?.ref.orEmpty()
         val cutoutUrl = runCatching { thumbDataUrl(cutout, png = true) }.getOrNull().orEmpty()
+        // Nothing found: say so, instead of an "ok" with the untouched picture (apps showed it as the sticker).
+        if (cutoutUrl.isEmpty()) {
+            return json(404, """{"ok":false,"error":${jsonStr("Couldn't find '${prompt.take(60)}' in the picture. Try another word for the main thing in it.")}}""")
+        }
         return json(200, """{"ok":true,"ref":${jsonStr(annotated)},"dataUrl":${jsonStr(dataUrl)},"cutoutRef":${jsonStr(cutout)},"cutoutDataUrl":${jsonStr(cutoutUrl)},"message":${jsonStr(result.message.take(500))}}""")
     }
 
