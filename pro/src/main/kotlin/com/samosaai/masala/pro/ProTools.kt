@@ -1,6 +1,7 @@
 package com.samosaai.masala.pro
 
 import android.content.Context
+import android.content.Intent
 import android.os.Environment
 import com.samosaai.masala.core.files.FileIndex
 import com.samosaai.masala.core.files.IndexStatus
@@ -20,9 +21,11 @@ import com.samosaai.masala.pro.files.GlobTool
 import com.samosaai.masala.pro.files.GrepTool
 import com.samosaai.masala.pro.files.ProFileAccess
 import com.samosaai.masala.pro.files.ProFileIndex
+import com.samosaai.masala.pro.install.ApkInstaller
 import com.samosaai.masala.pro.media.MediaConvertTool
 import com.samosaai.masala.pro.termux.TermuxBridge
 import com.samosaai.masala.pro.ProToolDefinitions as Defs
+import java.io.File
 
 /** The only entry point `:app` may use in `:pro` (plan 0.3). */
 object ProTools {
@@ -122,6 +125,19 @@ object ProTools {
         ).forEach(registry::register)
         return index
     }
+
+    /** Whether the user has let Masala install apps (needed for in-app updates). */
+    fun canInstallApps(context: Context): Boolean = ApkInstaller(context.applicationContext).canInstall()
+
+    /** Android's screen where the user lets Masala install apps. */
+    fun installPermissionIntent(context: Context): Intent = ApkInstaller(context.applicationContext).permissionSettingsIntent()
+
+    /**
+     * Installs [apk] through a PackageInstaller session; Android asks the user to confirm. Returns null
+     * once installed, otherwise why not. Installing an update of Masala itself ends this process.
+     */
+    suspend fun installApk(context: Context, apk: File): String? =
+        ApkInstaller(context.applicationContext).install(apk).let { if (it.success) null else it.message }
 
     private fun missing(param: String) = ActionResult.error("Missing or invalid required parameter '$param'.")
 }

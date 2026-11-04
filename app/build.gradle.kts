@@ -64,6 +64,9 @@ android {
         buildConfigField("String", "MASALA_STT_BASE_URL", "\"${samosaConfig("MASALA_STT_BASE_URL", llmBase)}\"")
         buildConfigField("String", "MASALA_STT_API_KEY", "\"${samosaConfig("MASALA_STT_API_KEY", samosaConfig("MASALA_LLM_API_KEY", ""))}\"")
         buildConfigField("String", "MASALA_STT_MODEL", "\"${samosaConfig("MASALA_STT_MODEL", "")}\"")
+        // In-app updates from GitHub releases: only release builds, since an APK signed with the release
+        // key can't install over a debug-signed one.
+        buildConfigField("boolean", "UPDATE_CHECKS", "false")
     }
 
     // Release signing comes from env or `local.properties` (CI decodes the keystore from a secret).
@@ -95,6 +98,7 @@ android {
             buildConfigField("String", "MASALA_STT_BASE_URL", "\"\"")
             buildConfigField("String", "MASALA_STT_API_KEY", "\"\"")
             buildConfigField("String", "MASALA_STT_MODEL", "\"\"")
+            buildConfigField("boolean", "UPDATE_CHECKS", "true")
         }
 
         // What frame times are measured on (plan UI refresh U0): R8 and resource shrinking like a
@@ -104,6 +108,7 @@ android {
             isMinifyEnabled = true
             isShrinkResources = true
             signingConfig = signingConfigs.getByName("debug")
+            buildConfigField("boolean", "UPDATE_CHECKS", "false")
             matchingFallbacks += "release"
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
