@@ -23,7 +23,8 @@ class ConsultService(
     private val sessions: ConsultSessions,
     private val skill: (String) -> MasalaSkill?,
     private val agentFor: (MasalaSkill) -> MasalaAgent,
-    private val timeoutMs: Long = TIMEOUT_MS,
+    /** Read per consult: a model on the user's own network gets [LOCAL_TIMEOUT_MS]. */
+    private val timeoutMs: () -> Long = { TIMEOUT_MS },
 ) {
     sealed interface Outcome {
         /** [text] is what the main agent receives: the answer plus where it came from. */
@@ -93,7 +94,7 @@ class ConsultService(
             var missingAccess: String? = null
             val produced = mutableListOf<com.samosaai.masala.core.tool.Produced>()
             try {
-                val finished = withTimeoutOrNull(timeoutMs) {
+                val finished = withTimeoutOrNull(timeoutMs()) {
                     agent.run(ChatMessage("user", JsonPrimitive(asked))).collect { event ->
                         when (event) {
                             is AgentEvent.Done -> answer = event.text.ifBlank { null }
@@ -217,5 +218,11 @@ class ConsultService(
          * consult timed out on every build on the phone, and the retry rebuilt it from scratch.
          */
         const val TIMEOUT_MS = 180_000L
+
+        /**
+         * A model on the user's own computer (LM Studio, Ollama) re-reads the ~20k-token prompt on every
+         * step and writes an app at local speed: one app build there took longer than [TIMEOUT_MS].
+         */
+        const val LOCAL_TIMEOUT_MS = 900_000L
     }
 }
