@@ -38,9 +38,9 @@ Key architectural facts:
 
 ### 2.3 Provenance + public-release rule (non-negotiable)
 
-The repo was made public via history rewrite. Private material (sibling checkouts, REDACTED sources, internal docs and keys) never enters the public tree.
+The repo was made public via history rewrite. Private material (non-public checkouts, third-party sources, internal docs and keys) never enters the public tree.
 
-- **Borrow freely, keep private sources unnamed.** Agents can and should reuse logic from private sibling checkouts, upstream launchers, and third-party app ideas. But **never name the source in shippable code, comments, KDoc, commit messages, or shippable docs** — no private repo names, REDACTED terms, sibling checkout paths, internal hostnames or domains, or absolute local paths.
+- **Borrow freely, keep private sources unnamed.** Agents can and should reuse logic from private sibling checkouts, upstream launchers, and third-party app ideas. But **never name the source in shippable code, comments, KDoc, commit messages, or shippable docs** — no private repo names, sibling checkout paths, internal hostnames or domains, or absolute local paths.
 - **Keep private notes out of the public tree.** Anything that names non-public sources, local paths, or internal systems does not belong in shippable docs, comments, or commit messages — keep those notes outside the repo.
 - **Only exception: license-required attribution.** MIT/Apache-2.0/OFL require keeping notices: log them in `THIRD_PARTY.md` with a header in the file (Figtree pattern). GPL code is **study-only, never pasted** — reimplement from the idea with a header note like `core/.../AppSearch.kt:5`. When in doubt: take notes on the idea, close the file, write your own implementation.
 - Before each merge, grep the tree for private names, absolute local paths, and internal hostnames; the grep must come back empty.

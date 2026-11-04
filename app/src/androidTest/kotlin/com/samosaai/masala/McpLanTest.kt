@@ -34,7 +34,7 @@ import org.junit.runner.RunWith
  *   adb install --user 0 -r app/build/outputs/apk/debug/app-debug.apk
  *   adb install --user 0 -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
  *   adb shell am instrument -w -e class com.samosaai.masala.McpLanTest \
- *     -e mcpUrl http://192.168.1.20:17600/mcp \
+ *     -e mcpUrl http://192.0.2.10:17600/mcp \
  *     -e mcpTool voicebox.list_profiles \
  *     com.samosaai.masala.test/androidx.test.runner.AndroidJUnitRunner
  *

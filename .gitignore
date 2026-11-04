@@ -9,10 +9,6 @@ reference/upstream/*/**
 # Guard against future nested clones
 reference/upstream/*/.git/
 
-# APK analysis output: commit docs + metadata only, never the bulk output
-reference/reversed/*/analysis-output/
-reference/reversed/*/analysis-output/
-
 # Gradle / Android Studio
 .gradle/
 .kotlin/

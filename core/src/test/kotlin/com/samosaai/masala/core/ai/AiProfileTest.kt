@@ -25,7 +25,7 @@ class AiProfileTest {
 
     @Test
     fun `presets on the user's computer build their URL from the address typed`() {
-        assertEquals("http://192.168.1.20:1234/v1/", ProviderPresets.LmStudio.baseUrlFor("192.168.1.20"))
+        assertEquals("http://192.0.2.10:1234/v1/", ProviderPresets.LmStudio.baseUrlFor("192.0.2.10"))
         assertEquals("http://box.local:11434/v1/", ProviderPresets.Ollama.baseUrlFor(" http://box.local/ "))
         assertEquals(ProviderPresets.OpenAI.baseUrl, ProviderPresets.OpenAI.baseUrlFor("ignored"))
     }
