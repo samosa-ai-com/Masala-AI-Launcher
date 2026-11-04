@@ -1,0 +1,328 @@
+name: Release
+
+# Publishes a signed APK as a GitHub release. To cut one: bump versionCode and versionName in
+# app/build.gradle.kts, write the notes under "## [Unreleased]" in CHANGELOG.md, and push to main.
+# This workflow then runs CI's checks, builds and verifies the signed release APK, tags v<versionName>,
+# publishes the release with the APK attached, and commits CHANGELOG.md with the Unreleased section
+# renamed to the version.
+#
+# A push to main that touches app/build.gradle.kts without a version bump finds the tag already
+# published and does nothing. Run it by hand (Actions -> Release -> Run workflow) with dry_run on to
+# build and verify without publishing; the APK is then kept as a one-day workflow artifact.
+#
+# Needs repo secrets RELEASE_KEYSTORE_BASE64, RELEASE_STORE_PASSWORD, RELEASE_KEY_ALIAS,
+# RELEASE_KEY_PASSWORD and the repo variable RELEASE_CERT_SHA256 (see README "Releases").
+on:
+  push:
+    branches: [main]
+    paths:
+      - app/build.gradle.kts
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Build and verify only: no tag, no release, no commit"
+        type: boolean
+        default: true
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    permissions:
+      contents: write
+    env:
+      GRADLE_APK: app/build/outputs/apk/release/app-release.apk
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Read version from app/build.gradle.kts
+        id: version
+        run: |
+          NAME=$(grep -oP 'versionName\s*=\s*"\K[^"]+' app/build.gradle.kts | head -n1)
+          CODE=$(grep -oP 'versionCode\s*=\s*\K[0-9]+' app/build.gradle.kts | head -n1)
+          if [ -z "$NAME" ] || [ -z "$CODE" ]; then
+            echo "::error::couldn't read versionName/versionCode from app/build.gradle.kts"
+            exit 1
+          fi
+          # 0.x versions are previews: marked as pre-releases on GitHub.
+          case "$NAME" in 0.*) PRE=true ;; *) PRE=false ;; esac
+          {
+            echo "name=$NAME"
+            echo "code=$CODE"
+            echo "tag=v$NAME"
+            echo "asset=Masala-$NAME.apk"
+            echo "prerelease=$PRE"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Skip if this version was already released
+        id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.version.outputs.tag }}
+          ASSET: ${{ steps.version.outputs.asset }}
+        run: |
+          DRY_RUN=false
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.dry_run }}" = "true" ]; then
+            DRY_RUN=true
+          fi
+          echo "dry_run=$DRY_RUN" >> "$GITHUB_OUTPUT"
+
+          if [ "$DRY_RUN" = "true" ]; then
+            echo "Dry run: building and verifying $TAG without publishing."
+            echo "should_release=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # The tag and the changelog commit belong on main; other branches may only dry-run.
+          if [ "$GITHUB_REF" != "refs/heads/main" ]; then
+            echo "::error::Releases are cut from main only; run with dry_run on for $GITHUB_REF"
+            exit 1
+          fi
+
+          if ! git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
+            echo "$TAG is new: releasing."
+            echo "should_release=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # A run that died after "Create tag" also leaves the tag behind. Only treat the tag as
+          # "nothing to do" once the release and its APK are really there.
+          ASSETS=$(gh release view "$TAG" --json assets --jq '.assets[].name' 2>/dev/null || true)
+          if printf '%s\n' "$ASSETS" | grep -qxF "$ASSET"; then
+            echo "$TAG is already published with $ASSET: nothing to do."
+            echo "should_release=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "::error::$TAG is tagged but has no release carrying $ASSET. Recover with: gh release delete $TAG --yes; git push --delete origin $TAG — then re-run this workflow."
+          exit 1
+
+      - name: Take release notes from CHANGELOG.md
+        if: steps.check.outputs.should_release == 'true'
+        env:
+          DRY_RUN: ${{ steps.check.outputs.dry_run }}
+          VERSION: ${{ steps.version.outputs.name }}
+        run: |
+          python3 - <<'PYEOF'
+          import os, re, sys
+
+          dry_run = os.environ["DRY_RUN"] == "true"
+          version = os.environ["VERSION"]
+          path = "CHANGELOG.md"
+          text = open(path, encoding="utf-8").read()
+
+          headings = list(re.finditer(r"^## \[.+?\]\s*$", text, re.MULTILINE))
+          unreleased = next((m for m in headings if m.group().strip() == "## [Unreleased]"), None)
+          if unreleased is None:
+              sys.exit("::error::CHANGELOG.md has no '## [Unreleased]' section")
+          if any(m.group().strip() == f"## [{version}]" for m in headings):
+              sys.exit(f"::error::CHANGELOG.md already has a [{version}] section: bump the version in app/build.gradle.kts")
+
+          later = [m for m in headings if m.start() > unreleased.start()]
+          end = later[0].start() if later else len(text)
+          body = text[unreleased.end():end].strip("\n")
+          if not body.strip():
+              if not dry_run:
+                  sys.exit("::error::CHANGELOG.md's Unreleased section is empty: write the release notes before bumping the version")
+              body = "_(dry run: the Unreleased section is empty)_"
+
+          open("release_notes.md", "w", encoding="utf-8").write(body + "\n")
+          if not dry_run:
+              rolled = text[:unreleased.start()] + f"## [Unreleased]\n\n## [{version}]" + text[unreleased.end():]
+              open(path, "w", encoding="utf-8").write(rolled)
+          PYEOF
+
+      - uses: actions/setup-java@v4
+        if: steps.check.outputs.should_release == 'true'
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: gradle/actions/setup-gradle@v4
+        if: steps.check.outputs.should_release == 'true'
+
+      # The same gate as ci.yml, so a release never ships what CI would reject.
+      - name: Check
+        if: steps.check.outputs.should_release == 'true'
+        run: >
+          ./gradlew --parallel --console=plain
+          :core:test
+          :app:testDebugUnitTest
+          :app:lintDebug
+          :app:checkDebugManifestPolicy
+          :app:checkProfileManifestPolicy
+          :app:checkProImports
+          :app:checkListCalls
+
+      - name: Configure release signing
+        if: steps.check.outputs.should_release == 'true'
+        env:
+          RELEASE_KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
+          RELEASE_STORE_PASSWORD: ${{ secrets.RELEASE_STORE_PASSWORD }}
+          RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
+          RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
+        run: |
+          for name in RELEASE_KEYSTORE_BASE64 RELEASE_STORE_PASSWORD RELEASE_KEY_ALIAS RELEASE_KEY_PASSWORD; do
+            if [ -z "${!name}" ]; then
+              echo "::error::Repo secret $name is not set: the release APK can't be signed"
+              exit 1
+            fi
+          done
+          KEYSTORE="$RUNNER_TEMP/release.jks"
+          printf '%s' "$RELEASE_KEYSTORE_BASE64" | base64 -d > "$KEYSTORE"
+          # Read by app/build.gradle.kts (environment variables win over local.properties).
+          {
+            echo "RELEASE_STORE_FILE=$KEYSTORE"
+            echo "RELEASE_STORE_PASSWORD=$RELEASE_STORE_PASSWORD"
+            echo "RELEASE_KEY_ALIAS=$RELEASE_KEY_ALIAS"
+            echo "RELEASE_KEY_PASSWORD=$RELEASE_KEY_PASSWORD"
+          } >> "$GITHUB_ENV"
+
+      # No model endpoint or key is passed: release builds compile in blank ones on purpose (users
+      # bring their own in Settings -> Models & keys).
+      - name: Assemble release APK
+        if: steps.check.outputs.should_release == 'true'
+        run: ./gradlew --console=plain :app:assembleRelease
+
+      - name: Verify the APK
+        if: steps.check.outputs.should_release == 'true'
+        id: verify
+        env:
+          EXPECTED_CERT_SHA256: ${{ vars.RELEASE_CERT_SHA256 }}
+          DRY_RUN: ${{ steps.check.outputs.dry_run }}
+        run: |
+          APK="$GRADLE_APK"
+          BUILD_TOOLS=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -n1)
+          CERTS=$("$BUILD_TOOLS/apksigner" verify --print-certs "$APK")
+          echo "$CERTS"
+          # The label differs across build-tools versions, so match the digest itself.
+          ACTUAL=$(printf '%s\n' "$CERTS" \
+            | sed -n 's/.*certificate SHA-256 digest: *\([0-9a-fA-F]\{64\}\).*/\1/p' | head -n1 | tr 'A-F' 'a-f')
+          if [ -z "$ACTUAL" ]; then
+            echo "::error::Could not read the signing certificate SHA-256 from apksigner (see above)"
+            exit 1
+          fi
+          if printf '%s\n' "$CERTS" | grep -q "CN=Android Debug"; then
+            echo "::error::APK is signed with the debug key"
+            exit 1
+          fi
+          # A different key can't update an installed copy (INSTALL_FAILED_UPDATE_INCOMPATIBLE):
+          # catch that here, not on people's phones. Accepts keytool's colon/upper-case format.
+          EXPECTED=$(printf '%s' "$EXPECTED_CERT_SHA256" | tr -d ': ' | tr 'A-F' 'a-f')
+          if [ -z "$EXPECTED" ]; then
+            if [ "$DRY_RUN" = "true" ]; then
+              echo "::warning::Repo variable RELEASE_CERT_SHA256 is not set; a real release would stop here. This key's digest: $ACTUAL"
+            else
+              echo "::error::Repo variable RELEASE_CERT_SHA256 is not set. This key's digest is $ACTUAL"
+              exit 1
+            fi
+          elif [ "$ACTUAL" != "$EXPECTED" ]; then
+            echo "::error::APK signed with the wrong key. Expected $EXPECTED, got $ACTUAL"
+            exit 1
+          fi
+
+          if "$BUILD_TOOLS/aapt2" dump xmltree --file AndroidManifest.xml "$APK" | grep -q 'debuggable.*=true'; then
+            echo "::error::APK is marked debuggable"
+            exit 1
+          fi
+
+          # Release builds must carry no endpoint: the placeholder host only appears in the dex if
+          # the release-only blank BuildConfig fields were lost.
+          DEX=$(mktemp -d)
+          unzip -q -o "$APK" 'classes*.dex' -d "$DEX"
+          if grep -qa "samosa-ai.example" "$DEX"/classes*.dex; then
+            echo "::error::APK contains the placeholder model endpoint: release builds must compile in blank ones"
+            exit 1
+          fi
+          rm -rf "$DEX"
+
+          echo "cert=$ACTUAL" >> "$GITHUB_OUTPUT"
+          echo "sha256=$(sha256sum "$APK" | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+          echo "Signature, debuggable and config checks passed."
+
+      - name: Keep the dry-run APK
+        if: steps.check.outputs.dry_run == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.version.outputs.asset }}
+          path: ${{ env.GRADLE_APK }}
+          retention-days: 1
+
+      - name: Create tag
+        if: steps.check.outputs.should_release == 'true' && steps.check.outputs.dry_run != 'true'
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "$TAG" -m "Release $TAG"
+          git push origin "$TAG"
+
+      - name: Create GitHub release
+        if: steps.check.outputs.should_release == 'true' && steps.check.outputs.dry_run != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.version.outputs.tag }}
+          ASSET: ${{ steps.version.outputs.asset }}
+          PRERELEASE: ${{ steps.version.outputs.prerelease }}
+          APK_SHA256: ${{ steps.verify.outputs.sha256 }}
+          CERT_SHA256: ${{ steps.verify.outputs.cert }}
+        run: |
+          {
+            echo ""
+            echo "---"
+            echo "**Install:** download \`$ASSET\` on the phone and open it (allow installs from your browser when Android asks)."
+            echo ""
+            echo "APK SHA-256: \`$APK_SHA256\`  "
+            echo "Signing certificate SHA-256: \`$CERT_SHA256\`"
+          } >> release_notes.md
+          # gh names the asset after the file, so upload a renamed copy; the Gradle output stays put.
+          cp "$GRADLE_APK" "$ASSET"
+          FLAGS=()
+          [ "$PRERELEASE" = "true" ] && FLAGS+=(--prerelease)
+          gh release create "$TAG" "$ASSET" --title "Masala $TAG" --notes-file release_notes.md --verify-tag "${FLAGS[@]}"
+
+          # What people download must be what was verified above.
+          gh release download "$TAG" --pattern "$ASSET" --output published.apk --clobber
+          PUBLISHED=$(sha256sum published.apk | cut -d' ' -f1)
+          if [ "$PUBLISHED" != "$APK_SHA256" ]; then
+            echo "::error::Published asset sha256 ($PUBLISHED) != built APK ($APK_SHA256)"
+            exit 1
+          fi
+          rm -f "$ASSET" published.apk
+
+      # main takes direct pushes today. Pushes made with GITHUB_TOKEN don't trigger workflows, so
+      # this commit doesn't re-run CI or this release. If main gets a ruleset requiring PRs, open a
+      # PR here instead.
+      - name: Commit the rolled CHANGELOG.md
+        if: steps.check.outputs.should_release == 'true' && steps.check.outputs.dry_run != 'true'
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          rm -f release_notes.md
+          git add CHANGELOG.md
+          git commit -m "Changelog for $TAG"
+          git pull --rebase origin main
+          git push origin HEAD:main
+
+      - name: Summary
+        if: steps.check.outputs.should_release == 'true'
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+          DRY_RUN: ${{ steps.check.outputs.dry_run }}
+        run: |
+          {
+            if [ "$DRY_RUN" = "true" ]; then echo "### $TAG dry run passed (nothing published)"; else
+              echo "### $TAG published"
+              echo ""
+              echo "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/tag/$TAG"
+            fi
+            echo ""
+            echo "- APK SHA-256: \`${{ steps.verify.outputs.sha256 }}\`"
+            echo "- Signing certificate SHA-256: \`${{ steps.verify.outputs.cert }}\`"
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -55,3 +55,31 @@ tool directly, without the model.
 
 Speech-to-text uses the same endpoint unless `MASALA_STT_BASE_URL`, `MASALA_STT_API_KEY` and
 `MASALA_STT_MODEL` say otherwise.
+
+Release builds ignore all of the above: they compile in no endpoint, model or key, and people choose a
+provider and paste their own key in **Settings → Models & keys**.
+
+## Releases
+
+Signed APKs are published as [GitHub releases](../../releases) by `.github/workflows/release.yml`:
+
+1. Bump `versionCode` and `versionName` in `app/build.gradle.kts`.
+2. Write the release notes under `## [Unreleased]` in [`CHANGELOG.md`](CHANGELOG.md).
+3. Push to `main`. The workflow runs CI's checks, builds and verifies the signed APK, tags
+   `v<versionName>`, publishes `Masala-<versionName>.apk` (as a pre-release while the version is
+   `0.x`) and commits `CHANGELOG.md` with the notes moved under the new version.
+
+**Actions → Release → Run workflow** with *dry run* on builds and verifies without publishing, and keeps
+the APK as a one-day workflow artifact.
+
+The workflow needs these repository settings:
+
+| Name | Kind | Value |
+|---|---|---|
+| `RELEASE_KEYSTORE_BASE64` | secret | `base64 -w0 <keystore>.jks` |
+| `RELEASE_STORE_PASSWORD`, `RELEASE_KEY_ALIAS`, `RELEASE_KEY_PASSWORD` | secrets | the keystore's credentials |
+| `RELEASE_CERT_SHA256` | variable | the key's certificate digest (`apksigner verify --print-certs`, or the first dry run prints it) |
+
+Keep the keystore backed up: an APK signed with any other key can't update an installed Masala.
+Locally, the same `RELEASE_*` names in `local.properties` sign `./gradlew :app:assembleRelease`;
+without them the release APK is unsigned.
