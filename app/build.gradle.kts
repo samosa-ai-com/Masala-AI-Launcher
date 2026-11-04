@@ -64,9 +64,43 @@ android {
         buildConfigField("String", "MASALA_STT_BASE_URL", "\"${samosaConfig("MASALA_STT_BASE_URL", llmBase)}\"")
         buildConfigField("String", "MASALA_STT_API_KEY", "\"${samosaConfig("MASALA_STT_API_KEY", samosaConfig("MASALA_LLM_API_KEY", ""))}\"")
         buildConfigField("String", "MASALA_STT_MODEL", "\"${samosaConfig("MASALA_STT_MODEL", "")}\"")
+        // In-app updates from GitHub releases: only release builds, since an APK signed with the release
+        // key can't install over a debug-signed one.
+        buildConfigField("boolean", "UPDATE_CHECKS", "false")
+    }
+
+    // Release signing comes from env or `local.properties` (CI decodes the keystore from a secret).
+    // Without RELEASE_STORE_FILE there is no release config and the release APK stays unsigned:
+    // it then fails at install instead of passing as an official build signed with the debug key.
+    signingConfigs {
+        samosaConfig("RELEASE_STORE_FILE", "").takeIf { it.isNotBlank() }?.let { store ->
+            create("release") {
+                storeFile = file(store)
+                storePassword = samosaConfig("RELEASE_STORE_PASSWORD", "")
+                keyAlias = samosaConfig("RELEASE_KEY_ALIAS", "")
+                keyPassword = samosaConfig("RELEASE_KEY_PASSWORD", "")
+            }
+        }
     }
 
     buildTypes {
+        getByName("release") {
+            signingConfig = signingConfigs.findByName("release")
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+
+            // Published APKs carry no endpoint and no key: anything compiled in can be pulled out of a
+            // public APK. Users choose a provider and enter their own key in Settings → Models & keys.
+            buildConfigField("String", "MASALA_LLM_BASE_URL", "\"\"")
+            buildConfigField("String", "MASALA_LLM_API_KEY", "\"\"")
+            buildConfigField("String", "MASALA_LLM_MODEL", "\"\"")
+            buildConfigField("String", "MASALA_STT_BASE_URL", "\"\"")
+            buildConfigField("String", "MASALA_STT_API_KEY", "\"\"")
+            buildConfigField("String", "MASALA_STT_MODEL", "\"\"")
+            buildConfigField("boolean", "UPDATE_CHECKS", "true")
+        }
+
         // What frame times are measured on (plan UI refresh U0): R8 and resource shrinking like a
         // release, but signed with the debug key so it installs over a debug build and keeps its data.
         create("profile") {
@@ -74,6 +108,7 @@ android {
             isMinifyEnabled = true
             isShrinkResources = true
             signingConfig = signingConfigs.getByName("debug")
+            buildConfigField("boolean", "UPDATE_CHECKS", "false")
             matchingFallbacks += "release"
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }

@@ -13,6 +13,8 @@ reference/upstream/*/.git/
 .gradle/
 .kotlin/
 build/
+# Android Studio "Generate Signed APK" output
+app/release/
 bin/
 local.properties
 .env

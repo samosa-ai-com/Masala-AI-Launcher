@@ -492,6 +492,7 @@ class MasalaApp : Application() {
             run = { dispatcher.dispatch(it, NoScreen) },
             skills = { skills.getAllSkills() },
             newAgent = { agent(LlmAgentModel(LlmConfig.default.client(this))) },
+            notConfiguredText = getString(R.string.model_not_configured),
             speech = ConfiguredSpeechInput(
                 stt,
                 { SpeechConfig.default },
@@ -758,6 +759,7 @@ class MasalaApp : Application() {
         // orphaned — not only the ones older than the heartbeat window.
         scope.launch { runCatching { meetings.recoverStale(olderThanMs = 0) } }
         com.samosaai.masala.widgets.WidgetHttpWorker.ensure(this)
+        com.samosaai.masala.update.UpdateCheckWorker.ensure(this)
         catalog = AppCatalog(this, scope)
         icons = IconCache(this, catalog)
         actions = AppActions(this, catalog) { usage.record(it) }
