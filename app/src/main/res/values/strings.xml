@@ -102,6 +102,7 @@
     <string name="settings_home_app">Home app</string>
     <string name="settings_home_app_is_default">Masala is your home app</string>
     <string name="settings_home_app_not_default">Masala isn’t your home app yet</string>
+    <string name="settings_no_model">No model set up yet</string>
     <string name="settings_home_app_choose">Choose home app</string>
     <string name="settings_appearance">Appearance</string>
     <string name="settings_theme">Theme</string>
@@ -167,6 +168,8 @@
     <string name="confirm_destructive_title">This can\’t be undone</string>
     <string name="confirm_allow">Allow</string>
     <string name="confirm_cancel">Cancel</string>
+    <string name="confirm_show_details">Show details</string>
+    <string name="confirm_hide_details">Hide details</string>
     <string name="question_title">A question for you</string>
     <string name="question_custom_hint">Or answer in your own words…</string>
     <string name="question_send">Send</string>

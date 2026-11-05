@@ -6,6 +6,14 @@ installing the APK.
 
 ## [Unreleased]
 
+### Changed
+- **Clearer "Allow this?" questions.** Before Masala changes something, it now says what will happen
+  in plain words, such as "Change your home screen: “Add Calculator and Clock”". The exact request
+  is still one tap away under **Show details**.
+
+### Fixed
+- Settings showed "Custom ·" before a model was chosen. It now says "No model set up yet".
+
 ## [0.1.0]
 First public preview. Expect rough edges: layouts, settings and data may change between previews.
 

@@ -263,7 +263,7 @@ class SettingsActivity : ComponentActivity() {
         val auto = MasalaColors.Chili
         val data = MasalaColors.Cardamom
         val entries = buildList {
-            add(Entry(0, Icons.Rounded.Key, ai, stringResource(R.string.ai_models_title), "${profile.chat.preset.name} · ${profile.chat.model}", onAiModels))
+            add(Entry(0, Icons.Rounded.Key, ai, stringResource(R.string.ai_models_title), chatSummary(profile.chat), onAiModels))
             add(Entry(0, Icons.Rounded.Mic, voice, stringResource(R.string.voice_title), "${profile.voiceIn?.preset?.name ?: stringResource(R.string.voice_on_phone)} · ${stringResource(R.string.voice_tap)}", onVoice))
             add(Entry(0, Icons.Rounded.Person, ai, stringResource(R.string.settings_profile), stringResource(R.string.settings_profile_summary)) { startActivity(Intent(this@SettingsActivity, ProfileActivity::class.java)) })
             add(Entry(1, Icons.Rounded.Palette, look, stringResource(R.string.appearance_title), stringResource(R.string.appearance_summary)) { onPage(Page.APPEARANCE) })
@@ -328,7 +328,7 @@ class SettingsActivity : ComponentActivity() {
                         com.samosaai.masala.ui.character.MasalaCharacter(settings.character, com.samosaai.masala.ui.character.CharacterState.HELLO, Modifier.size(46.dp))
                         Column(Modifier.weight(1f)) {
                             Text(stringResource(if (isDefault) R.string.settings_home_app_is_default else R.string.settings_home_app_not_default), style = MaterialTheme.typography.titleSmall)
-                            Text("${profile.chat.preset.name} · ${profile.chat.model}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(chatSummary(profile.chat), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
                 }
@@ -1438,4 +1438,15 @@ class SettingsActivity : ComponentActivity() {
         /** A [Page] name to open directly. */
         const val EXTRA_PAGE = "page"
     }
+}
+
+/**
+ * The chat model line in Settings: the provider and model, only the provider while the server picks
+ * the model, or "no model set up" on a fresh install (release builds ship no endpoint).
+ */
+@Composable
+private fun chatSummary(chat: com.samosaai.masala.core.ai.Endpoint): String = when {
+    chat.baseUrl.isBlank() -> stringResource(R.string.settings_no_model)
+    chat.model.isBlank() -> chat.preset.name
+    else -> "${chat.preset.name} · ${chat.model}"
 }
