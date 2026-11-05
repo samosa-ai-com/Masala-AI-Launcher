@@ -15,12 +15,12 @@ screen that has to draw instantly.
 
 | Suite | Where | Tests | Runs on |
 |---|---|---:|---|
-| `:core` unit | [`core/src/test/`](../../core/src/test/) | **418** | Any JVM, seconds, no Android SDK needed |
+| `:core` unit | [`core/src/test/`](../../core/src/test/) | **422** | Any JVM, seconds, no Android SDK needed |
 | `:pro` unit | [`pro/src/test/`](../../pro/src/test/) | **50** | JVM |
-| `:app` unit | [`app/src/test/`](../../app/src/test/) + `testDebug` | **847** | JVM, without Robolectric (fakes behind interfaces) |
+| `:app` unit | [`app/src/test/`](../../app/src/test/) + `testDebug` | **862** | JVM, without Robolectric (fakes behind interfaces) |
 | `build-logic` | [`build-logic/src/test/`](../../build-logic/src/test/) | **10** | JVM |
 | Instrumented | [`app/src/androidTest/`](../../app/src/androidTest/) | **52** | Device or emulator |
-| **Total** | | **1,377** | |
+| **Total** | | **1,396** | |
 
 ### Strategy
 
@@ -80,7 +80,18 @@ PR (a PR that only touches docs skips it):
 
 The Play readiness report is posted to the **job summary** on every run, so a reviewer sees what the
 restricted module adds without downloading anything. In-progress runs on the same ref are
-cancelled.
+cancelled. Jobs run on the project's self-hosted runner; **pull requests from forks run on a
+GitHub-hosted runner instead**, so outside code never runs on project hardware.
+
+### Releases
+
+[`.github/workflows/release.yml`](../../.github/workflows/release.yml) cuts a release when
+`versionCode`/`versionName` change on `main`. It runs CI's checks, builds the signed APK, and
+**verifies** it. Sentinel values passed for every endpoint and key input must not appear in the APK,
+the signing certificate must match a pinned SHA-256, and the debug key is rejected. It then tags
+`v<versionName>`, publishes the GitHub release with the APK, renames `## [Unreleased]` in
+[`CHANGELOG.md`](../../CHANGELOG.md) to the version, and commits `update.json` for in-app updates.
+A manual run defaults to a **dry run** that builds and verifies without publishing.
 
 ---
 

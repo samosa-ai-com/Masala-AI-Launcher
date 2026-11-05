@@ -1,0 +1,7 @@
+{
+  "versionCode": 2,
+  "versionName": "0.1.1",
+  "downloadUrl": "https://github.com/samosa-ai-com/Masala-AI-Launcher/releases/download/v0.1.1/Masala-0.1.1.apk",
+  "sha256": "da1f6e9257e21a45b11200677021f5f63685d8526dbb1479b6028452da0ed913",
+  "releaseNotes": "### Changed\n- **Clearer \"Allow this?\" questions.** Before Masala changes something, it now says what will happen\n  in plain words, such as \"Change your home screen: “Add Calculator and Clock”\". The exact request\n  is still one tap away under **Show details**.\n\n### Fixed\n- Settings showed \"Custom ·\" before a model was chosen. It now says \"No model set up yet\"."
+}

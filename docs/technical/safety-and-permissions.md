@@ -53,10 +53,14 @@ flowchart LR
   it never leaks into other chats or background runs. It is read when the question is asked, so
   flipping it mid-turn applies to the next question. **It never skips a destructive question.**
   Auto-allowed calls are still logged as `allowed (allow all)`.
-- **Readable summaries.** Arguments are shown, with long values cut to 120 chars plus their size, so
-  the buttons stay on screen. Common tools get plain-English summaries: *"Add "Snake" to your home
-  screen as an app"*, *"Delete the "water" widget everywhere"*.
-- **Every answer is audited**, including timeouts, as `confirm:<tool>`.
+- **Plain words first, the exact call one tap away.** The sheet shows a sentence, never JSON: either
+  the tool's own wording (*"Add "Snake" to your home screen as an app"*, *"Delete the "water" widget
+  everywhere"*, *"Turn the "focus" mode on"*), or an action built from the tool name plus the
+  argument that names it (`label`, `title`, `name`, …), quoted and cut at 80 chars. For example,
+  *"Change your home screen: "Add Calculator and Clock""*. The exact call (tool name and arguments,
+  long values cut to 120 chars plus their size) sits under **Show details**.
+- **Every answer is audited**, including timeouts, as `confirm:<tool>`. The log records the **exact
+  call**, not the sentence, so an audit sees what actually ran.
 
 **What asks.** A tool asks when `needsConfirmation(args)` is true. By default that means its
 sensitivity isn't `READ_ONLY`. A few tools narrow it per call (memory writes apply with Undo, and
@@ -144,7 +148,7 @@ touch private data.
 | Model traffic logs | Full bodies in **debug builds only**, with `Authorization` redacted. None in release. |
 | Location | `get_location` returns the coarse last-known fix, **rounded to about a kilometre**. |
 | Health | Read-only Health Connect (steps, sleep), shown with a rationale screen. Nothing is uploaded unless the user asks the model about it. |
-| Release build | Ships **no** model endpoint or key; you configure your own. |
+| Release build | Ships **no** model endpoint or key; you configure your own. The release workflow builds with sentinel values in every config input and **fails if any of them reaches the APK**. |
 
 **Cleartext HTTP** is allowed app-wide, because users run model and MCP servers on their home
 network ([`network_security_config.xml`](../../app/src/main/res/xml/network_security_config.xml)).
@@ -161,7 +165,7 @@ Everything Google Play restricts lives in `:pro`:
 | `:pro` entry | For |
 |---|---|
 | `MANAGE_EXTERNAL_STORAGE` | All-files `FileAccess`; `list_files`, `read_file`, `write_file`, `edit`, `glob`, `grep`, `file_search` |
-| `REQUEST_INSTALL_PACKAGES` | APK export from the app/game makers via a `PackageInstaller` session |
+| `REQUEST_INSTALL_PACKAGES` | APK export from the app/game makers, and **in-app updates**, both through a `PackageInstaller` session |
 | `com.termux.permission.RUN_COMMAND` + `<queries> com.termux` | ffmpeg through Termux for `media_convert` |
 | two non-exported receivers | Termux results and install status |
 
@@ -183,7 +187,26 @@ storage**. The `FileAccess` interface has a Play-safe implementation
 and `:pro` swaps in all-files access at registration. Tools read `registry.fileAccess` on every call,
 so granting All-files access takes effect without a restart.
 
-## 8. Permissions and why
+## 8. In-app updates
+
+Release builds check for new versions on their own, and every step that could be abused is checked:
+
+- [`UpdateCheckWorker`](../../app/src/main/kotlin/com/samosaai/masala/update/UpdateCheckWorker.kt)
+  reads `update.json` from the repository's `main` branch **every 12 hours** on a connected
+  network, and posts one notification per new version. Debug builds don't check.
+- [`AppUpdates`](../../core/src/main/kotlin/com/samosaai/masala/core/update/AppUpdates.kt) (pure
+  `:core`) parses the manifest strictly (version code > 0, a 64-hex SHA-256) and accepts only an
+  **https link to this repository's release downloads**.
+- [`UpdateChecker`](../../app/src/main/kotlin/com/samosaai/masala/update/UpdateChecker.kt) downloads
+  into a file of its own and **refuses an APK whose SHA-256 doesn't match** the manifest. One update
+  runs at a time per process, and a cancelled download cancels the HTTP call.
+- The install goes through `ProTools.installApk` (a `PackageInstaller` session). Android asks the
+  user to confirm and **refuses any APK signed with a different key**.
+- The [release workflow](../../.github/workflows/release.yml) verifies the signing certificate's
+  SHA-256 against a pinned repo variable, and fails on the debug key, before it publishes the APK and
+  writes `update.json`.
+
+## 9. Permissions and why
 
 From [`app/manifest-allowlist.txt`](../../app/manifest-allowlist.txt). Every permission is optional:
 a feature without its permission reports `NeedsCapability`, the chat offers a Grant button, and the

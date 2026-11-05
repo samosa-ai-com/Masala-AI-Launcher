@@ -35,7 +35,7 @@ confirmation gate and one append-only audit log.
 | 🧠 **[Skills, memory & automation](skills-memory-and-automation.md)** | Personas, Skill Hub policy, Second Brain, scheduled runs, MCP. |
 | 🎙️ **[Voice & meetings](voice-and-meetings.md)** | Push-to-talk, TTS, hours-long meeting recording with diarisation. |
 | 🦙 **[Built on Meta AI](meta-ai.md)** | The Meta preset, Muse models, SAM 3.1 segmentation, the mask codec port. |
-| ✅ **[Engineering quality](engineering-quality.md)** | 1,377 tests, CI guards, the manifest policy, performance work. |
+| ✅ **[Engineering quality](engineering-quality.md)** | 1,396 tests, CI guards, the manifest policy, performance work. |
 | ❓ **[FAQ & known limitations](faq.md)** | What it doesn't do yet, and why. |
 
 ---
@@ -95,10 +95,11 @@ confirmation gate and one append-only audit log.
 
 ## Project status
 
-**v0.1.0, prototype-first.** Phases 0–2 (contracts, launcher base, layout engine) are complete.
+**v0.1.1, prototype-first.** Phases 0–2 (contracts, launcher base, layout engine) are complete.
 Phases 3–4 (AI home screens, agent and skill runtime) are largely built, and later phases add more
-widgets, modes and Pro skills. The Play Store decision comes later. Until then the release APK ships
-from GitHub Releases, and neither the release APK nor this repository contains a model endpoint or key.
+widgets, modes and Pro skills. The Play Store decision comes later. Until then the signed APK ships
+from GitHub Releases and updates itself in-app. Neither the APK nor this repository contains a model
+endpoint or key. Masala is licensed under **AGPL-3.0**.
 
 ## At a glance
 
@@ -108,7 +109,7 @@ from GitHub Releases, and neither the release APK nor this repository contains a
 - **Model:** any OpenAI-compatible endpoint; 11 provider presets including Meta, OpenAI, Anthropic, Gemini, Groq, OpenRouter, Mistral, LM Studio, Ollama, Speaches, Custom
 - **Persistence:** Room (19 tables, schema v13) in `:app` plus a separate `:pro` database with an FTS4 file index; DataStore; plain files for chats and memory
 - **Code size:** ~93k lines of Kotlin; ~7.7k in `:core`, ~3.1k in `:pro`, ~61k in `:app` main
-- **Tests:** 1,325 JVM unit tests (`:core` 418, `:pro` 50, `:app` 847, `build-logic` 10) + 52 instrumented tests
+- **Tests:** 1,344 JVM unit tests (`:core` 422, `:pro` 50, `:app` 862, `build-logic` 10) + 52 instrumented tests
 
 > **About these docs.** They describe the code on `main` and link to the source for every claim.
 > They are written so they can move to the Samosa AI website later (`/masala/docs/…`) without

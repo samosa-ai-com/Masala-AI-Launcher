@@ -20,10 +20,20 @@ concurrency:
 
 jobs:
   check:
-    runs-on: ubuntu-latest
+    # Our self-hosted runner: no Actions minutes. It takes one job at a time. The repo is public, so
+    # PRs from forks run on a GitHub-hosted runner instead: outside code never runs on our machine.
+    runs-on: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository) && 'ubuntu-latest' || fromJSON('["self-hosted", "chanakya"]') }}
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+
+      # Self-hosted only: the checkout has no local.properties (gitignored),
+      # so Gradle needs ANDROID_HOME. GitHub-hosted images set it already.
+      - name: Point at BeyondMax Android SDK
+        if: runner.environment != 'github-hosted'
+        run: |
+          echo "ANDROID_HOME=/home/rishabh/Android/Sdk" >> "$GITHUB_ENV"
+          echo "ANDROID_SDK_ROOT=/home/rishabh/Android/Sdk" >> "$GITHUB_ENV"
 
       - uses: actions/setup-java@v4
         with:

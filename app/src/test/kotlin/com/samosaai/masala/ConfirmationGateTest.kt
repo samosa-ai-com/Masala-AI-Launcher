@@ -178,4 +178,49 @@ class ConfirmationGateTest {
         assertTrue(summary.length < 400, summary)
         assertTrue(summary.contains("characters)"), summary)
     }
+
+    @Test
+    fun `a layout change is asked in words, with the exact call behind details`() = runBlocking<Unit> {
+        val gate = gate()
+        val layout = "{\"pages\":" + "x".repeat(20_000) + "}"
+        val edit = object : Tool {
+            override val definition = ToolDefinition("edit_layout", "", JsonObject(emptyMap()))
+            override val sensitivity = ToolSensitivity.CHANGES_SOMETHING
+            override suspend fun execute(args: JsonObject) = ToolResult.Success("ran")
+        }
+        val args = JsonObject(mapOf("label" to JsonPrimitive("Add Calculator and Clock"), "layout_json" to JsonPrimitive(layout)))
+        val check = async { gate.check(edit, args) }
+        while (gate.pending.value == null) delay(5)
+        val asked = gate.pending.value!!
+        assertEquals("Change your home screen: \u201CAdd Calculator and Clock\u201D", asked.summary)
+        assertTrue(asked.details!!.startsWith("edit_layout {"), asked.details)
+        gate.answer(true)
+        assertNull(check.await())
+        // The log keeps the exact call for audits, cut like before.
+        assertTrue(log.single().second.contains("characters)"), log.single().second)
+    }
+
+    @Test
+    fun `describe never shows JSON`() {
+        assertEquals(
+            "Replace your whole home screen: \u201CFresh start\u201D",
+            ConfirmationGate.describe("edit_layout", JsonObject(mapOf("label" to JsonPrimitive("Fresh start"), "replace_all" to JsonPrimitive(true), "layout_json" to JsonPrimitive("{}")))),
+        )
+        assertEquals("Change your home screen", ConfirmationGate.describe("edit_layout", JsonObject(mapOf("layout_json" to JsonPrimitive("{}")))))
+        assertEquals("Turn the \u201Cwork\u201D mode off", ConfirmationGate.describe("set_mode", JsonObject(mapOf("id" to JsonPrimitive("work"), "on" to JsonPrimitive(false)))))
+        // Any other tool: its name as words and what it is about, skipping JSON and multi-line values.
+        assertEquals(
+            "Memory write: \u201CLikes chai\u201D",
+            ConfirmationGate.describe("memory_write", JsonObject(mapOf("body" to JsonPrimitive("{\"a\":1}"), "title" to JsonPrimitive("Likes chai")))),
+        )
+        assertEquals("Set alarm", ConfirmationGate.describe("set_alarm", JsonObject(mapOf("hour" to JsonPrimitive(7)))))
+        assertEquals("Set alarm", ConfirmationGate.describe("set_alarm", JsonObject(mapOf("label" to JsonPrimitive("{\"x\":1}")))))
+        // Sentences that already were plain stay identical, so the sheet shows no details for them.
+        assertEquals(
+            ConfirmationGate.summarize("place_widget", JsonObject(mapOf("id" to JsonPrimitive("water")))),
+            ConfirmationGate.describe("place_widget", JsonObject(mapOf("id" to JsonPrimitive("water")))),
+        )
+        val long = "y".repeat(500)
+        assertTrue(ConfirmationGate.describe("compose_message", JsonObject(mapOf("text" to JsonPrimitive(long)))).length < 120)
+    }
 }

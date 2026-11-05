@@ -8,6 +8,11 @@ sidebar_position: 1
 Masala ships as a single Android APK. Build it, install it for your user, make it the home app,
 point it at a model, and talk to your phone.
 
+> **Just want to try it?** Download `Masala-<version>.apk` from the
+> [latest GitHub release](https://github.com/samosa-ai-com/Masala-AI-Launcher/releases/latest), install it,
+> pick Masala as your home app, and skip to [step 4](#4-configure-the-model). New versions show up in
+> **Settings → About** and install after you confirm.
+
 ---
 
 ## 1. Requirements
@@ -133,7 +138,7 @@ Debug builds add **Settings → Debug** ([`app/src/debug/`](../../app/src/debug/
 
 | Symptom | Cause / fix |
 |---|---|
-| "No model is set up" | Settings → Masala AI → Models & keys: pick a preset, a model and a key. |
+| "No model set up yet" | A release build ships with no endpoint. Settings → Models & keys: pick a preset, a model and a key. |
 | HTTP 400 on every message from a local model | Usually an argument-free tool schema. Masala adds `properties: {}`; update to the latest build. |
 | Long replies cut off on a LAN model | The read timeout is 900 s for local hosts. Check that the host really is local (`10.x`, `192.168.x`, `localhost`). |
 | A tool says "Not run: … needs …" | A permission or special access is missing. The chat shows a Grant button, and the run finishes without that tool. |

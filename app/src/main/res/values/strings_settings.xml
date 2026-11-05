@@ -101,4 +101,24 @@
     <string name="about_licences">Licences</string>
     <string name="about_richtext">Renders Markdown in replies</string>
     <string name="about_close">Close</string>
+    <string name="about_updates">Updates</string>
+    <string name="update_check_now">Check for updates</string>
+    <string name="update_checking">Checking…</string>
+    <string name="update_up_to_date">Masala is up to date</string>
+    <string name="update_nothing_published">No release published yet</string>
+    <string name="update_check_failed">Couldn’t check for updates: %1$s</string>
+    <string name="update_available">Masala %1$s is available</string>
+    <string name="update_install">Download and install</string>
+    <string name="update_downloading">Downloading… %1$d%%</string>
+    <string name="update_installing">Confirm the install in Android’s dialog</string>
+    <string name="update_failed">Update failed: %1$s</string>
+    <string name="update_allow_installs">Allow Masala to install updates</string>
+    <string name="update_allow_installs_summary">Android asks once. Then come back and tap Download and install.</string>
+    <string name="update_notify">Tell me about new versions</string>
+    <string name="update_notify_summary">Checks GitHub about twice a day</string>
+    <string name="update_all_releases">All releases on GitHub</string>
+    <string name="update_release_builds_only">Updates come with release builds from GitHub. This is a %1$s build.</string>
+    <string name="update_channel">Updates</string>
+    <string name="update_notification_title">Masala %1$s is available</string>
+    <string name="update_notification_text">Tap to see what’s new and install it.</string>
 </resources>

@@ -76,4 +76,4 @@ without them, and every file tool falls back to working on picked files.
 | **MCP read-only hints** | Not trusted; every MCP tool asks | A server's own annotation isn't proof. |
 | **Termux ffmpeg** | Needs Termux, the `RUN_COMMAND` grant and `allow-external-apps=true` | Termux runs under its own uid, so Masala can't exec its binaries directly. |
 | **Samosa sign-in** | Not yet; no Samosa preset | Use any preset with your own key, or a local server. |
-| **Play Store** | Not published yet | Prototype-first. The readiness report tracks what `:pro` would need declared. |
+| **Play Store** | Not published yet | Prototype-first. Signed APKs ship from GitHub Releases and update in-app; the readiness report tracks what `:pro` would need declared. |

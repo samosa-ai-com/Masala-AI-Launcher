@@ -60,6 +60,7 @@ The repo was made public via history rewrite. Private material (non-public check
 |------|---------|--------------|
 | `docs/plans/<feature>.md` | Per-feature plan (files, changes, verification, risks). One per phase/feature. Local only, gitignored. | Planning and during implementation. |
 | `THIRD_PARTY.md` | License attributions for copied-in material. | New MIT/Apache/OFL material added. |
+| `CHANGELOG.md` | User-facing release notes; the `[Unreleased]` section becomes the GitHub release text. | Any user-visible change; before every version bump. |
 | `docs/technical/` | Public technical documentation (architecture, layout engine, agent runtime, tool catalog, safety, widgets, skills/memory, voice, Meta AI, quality, FAQ). Written to move to the website later; every claim links to source. | Any change to behaviour, limits, tools, permissions or architecture that a page describes. Regenerate the tool catalog tables when tools change. |
 
 **If you add a doc file, add it to this table.**
@@ -71,7 +72,9 @@ The repo was made public via history rewrite. Private material (non-public check
 ```
 Masala/
 ├── AGENTS.md                        ← this file (entry point)
+├── LICENSE                          ← AGPL-3.0 (Samosa AI)
 ├── THIRD_PARTY.md                   ← license attributions
+├── CHANGELOG.md                     ← release notes ([Unreleased] → next GitHub release)
 ├── README.md                        ← build + module overview (shippable)
 ├── settings.gradle.kts              ← builds :core-only without Android SDK
 ├── build-logic/                     ← manifest-check plugin + Play readiness report
@@ -94,7 +97,8 @@ Masala/
 2. JVM-only: `./gradlew :core:test` (seconds, no device).
 3. Full app: `./gradlew assembleDebug`, then `adb install --user 0 -r app/build/outputs/apk/debug/app-debug.apk` (never bare `adb install` — the phone has three users).
 4. On device: set Masala as home → drawer/search/long-press → `Settings → Debug` (`/tool {json}` direct call or full prompt; `Context` panel fakes time/charging). `local.properties` holds `MASALA_LLM_*` / `MASALA_STT_*` (+ `SAMOSA_API_URL`).
-5. When new tooling/dependencies are needed, include them in the plan file and get approval before installing.
+5. Release: bump `versionCode`/`versionName` in `app/build.gradle.kts`, fill `## [Unreleased]` in `CHANGELOG.md`, push to `main` → `.github/workflows/release.yml` publishes the signed APK as a GitHub release (README → Releases). Release builds ship no model endpoint or key.
+6. When new tooling/dependencies are needed, include them in the plan file and get approval before installing.
 
 ---
 
