@@ -2,6 +2,26 @@
 
 An AI home-screen launcher for Android. Start with `AGENTS.md` (entry point).
 
+## Technical documentation
+
+**[docs/technical/](docs/technical/README.md)** explains how Masala works, in detail and with links to
+the source:
+
+| | |
+|---|---|
+| [Getting started](docs/technical/getting-started.md) | Build, install, configure a model, try it |
+| [Architecture](docs/technical/architecture.md) | Modules, component map, data flow, persistence, design decisions |
+| [Layout engine](docs/technical/layout-engine.md) | The layout document, rules, mode overlays, the checker, generation, undo |
+| [Agent runtime](docs/technical/agent-runtime.md) | The tool loop, context budgeting, tool scopes, experts, the LLM client |
+| [Tool catalog](docs/technical/tool-catalog.md) | All 107 built-in tools with sensitivity and data flags |
+| [Safety & permissions](docs/technical/safety-and-permissions.md) | Confirmation gate, audit log, prompt injection, Play/Pro split |
+| [Widgets & mini apps](docs/technical/widgets-and-mini-apps.md) | Widgets as data, the HTML sandbox, the Pocket Store |
+| [Skills, memory & automation](docs/technical/skills-memory-and-automation.md) | Personas, Skill Hub policy, Second Brain, scheduled runs, MCP |
+| [Voice & meetings](docs/technical/voice-and-meetings.md) | Push-to-talk, TTS, hours-long diarised meeting notes |
+| [Built on Meta AI](docs/technical/meta-ai.md) | The Meta preset, Muse models, SAM 3.1 segmentation, the mask codec |
+| [Engineering quality](docs/technical/engineering-quality.md) | Tests, build checks, CI, performance |
+| [FAQ & known limitations](docs/technical/faq.md) | What it doesn't do yet, and why |
+
 ## Modules
 
 | Module | What | Builds without the Android SDK |
