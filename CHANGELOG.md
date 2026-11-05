@@ -6,6 +6,7 @@ installing the APK.
 
 ## [Unreleased]
 
+## [0.1.0]
 First public preview. Expect rough edges: layouts, settings and data may change between previews.
 
 ### Added
