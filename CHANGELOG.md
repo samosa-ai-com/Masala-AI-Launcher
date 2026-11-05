@@ -6,6 +6,7 @@ installing the APK.
 
 ## [Unreleased]
 
+## [0.1.1]
 ### Changed
 - **Clearer "Allow this?" questions.** Before Masala changes something, it now says what will happen
   in plain words, such as "Change your home screen: “Add Calculator and Clock”". The exact request
