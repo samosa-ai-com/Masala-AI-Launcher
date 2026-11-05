@@ -61,6 +61,7 @@ The repo was made public via history rewrite. Private material (non-public check
 | `docs/plans/<feature>.md` | Per-feature plan (files, changes, verification, risks). One per phase/feature. Local only, gitignored. | Planning and during implementation. |
 | `THIRD_PARTY.md` | License attributions for copied-in material. | New MIT/Apache/OFL material added. |
 | `CHANGELOG.md` | User-facing release notes; the `[Unreleased]` section becomes the GitHub release text. | Any user-visible change; before every version bump. |
+| `docs/technical/` | Public technical documentation (architecture, layout engine, agent runtime, tool catalog, safety, widgets, skills/memory, voice, Meta AI, quality, FAQ). Written to move to the website later; every claim links to source. | Any change to behaviour, limits, tools, permissions or architecture that a page describes. Regenerate the tool catalog tables when tools change. |
 
 **If you add a doc file, add it to this table.**
 
@@ -84,6 +85,7 @@ Masala/
 │   ├── src/debug/                   ← DebugActivity (tool calls), ContextPanelActivity (fake context)
 │   └── src/androidTest/             ← ClassicHomeRenderTest
 └── docs/
+    ├── technical/                   ← public technical docs (linked from README)
     └── plans/                       ← per-feature plan files (local, gitignored)
 ```
 
