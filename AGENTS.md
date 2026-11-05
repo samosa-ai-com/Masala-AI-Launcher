@@ -71,6 +71,7 @@ The repo was made public via history rewrite. Private material (non-public check
 ```
 Masala/
 ├── AGENTS.md                        ← this file (entry point)
+├── LICENSE                          ← AGPL-3.0 (Samosa AI)
 ├── THIRD_PARTY.md                   ← license attributions
 ├── CHANGELOG.md                     ← release notes ([Unreleased] → next GitHub release)
 ├── README.md                        ← build + module overview (shippable)
