@@ -24,20 +24,20 @@ samosas, and it builds it on your home screen. It asks before it changes anythin
 
 <table>
 <tr>
-<td align="center" width="25%"><img src="docs/readme/home-wallpaper.webp" width="190" alt="A rainy Mumbai street painted as the wallpaper"></td>
-<td align="center" width="25%"><img src="docs/readme/sticker-app.webp" width="190" alt="A sticker maker app written by Masala"></td>
-<td align="center" width="25%"><img src="docs/readme/game.webp" width="190" alt="Samosa Slice, a game made from one sentence"></td>
-<td align="center" width="25%"><img src="docs/readme/cutout.webp" width="190" alt="SAM 3.1 cutting a coffee mug out of a photo"></td>
+<td align="center" width="25%"><img src="docs/readme/demo-wallpaper.webp" width="210" alt="A rainy Mumbai street painted as the wallpaper"></td>
+<td align="center" width="25%"><img src="docs/readme/demo-sticker.webp" width="210" alt="A sticker maker app written by Masala"></td>
+<td align="center" width="25%"><img src="docs/readme/demo-game.webp" width="210" alt="Samosa Slice, a game made from one sentence"></td>
+<td align="center" width="25%"><img src="docs/readme/demo-sam.webp" width="210" alt="SAM 3.1 cutting a coffee mug out of a photo"></td>
 </tr>
 <tr>
 <td align="center"><b>Home by voice</b><br><sub>“A rainy Mumbai street at night”: painted by Muse Image and set in 30 s</sub></td>
 <td align="center"><b>AI inside the apps it writes</b><br><sub>A sticker maker in 74 s. Image draws, SAM cuts out. No API key inside</sub></td>
 <td align="center"><b>A game from one sentence</b><br><sub>89 s from the spoken request to slicing samosas. Ask again to change it</sub></td>
-<td align="center"><b>It can see</b><br><sub>SAM 3.1 cuts out the mug, then tracks a person through 181 of 181 frames</sub></td>
+<td align="center"><b>It can see</b><br><sub>Attach a photo, say “cut out the coffee mug”: SAM 3.1 returns a real mask. It tracks people through video too (181 of 181 frames)</sub></td>
 </tr>
 </table>
 
-<sub>Real phone, real time. The on-screen timers count real seconds; waits are sped up where the clip says so.</sub>
+<sub>Real phone, looping clips cut for length. Waits are sped up where the on-screen label says so; the timers count real seconds.</sub>
 
 **And more:** a live camera from your network as a home widget · meetings transcribed with who said
 what · a Second Brain where every memory is a note you can read and edit · modes for morning, focus,
