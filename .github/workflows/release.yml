@@ -30,7 +30,8 @@ concurrency:
 
 jobs:
   release:
-    runs-on: ubuntu-latest
+    # Our self-hosted runner: no Actions minutes. It takes one job at a time.
+    runs-on: [self-hosted, chanakya]
     timeout-minutes: 40
     permissions:
       contents: write
@@ -40,6 +41,14 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
+      # Self-hosted only: the checkout has no local.properties (gitignored),
+      # so Gradle needs ANDROID_HOME. GitHub-hosted images set it already.
+      - name: Point at BeyondMax Android SDK
+        if: runner.environment != 'github-hosted'
+        run: |
+          echo "ANDROID_HOME=/home/rishabh/Android/Sdk" >> "$GITHUB_ENV"
+          echo "ANDROID_SDK_ROOT=/home/rishabh/Android/Sdk" >> "$GITHUB_ENV"
 
       - name: Read version from app/build.gradle.kts
         id: version
