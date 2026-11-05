@@ -9,6 +9,7 @@
 ![Seven Meta models](https://img.shields.io/badge/models-7%20Meta%20models-0866FF?logo=meta&logoColor=white)
 ![317 apps built in](https://img.shields.io/badge/apps%20built%20in-317-ECC97C)
 ![1,315 tests](https://img.shields.io/badge/unit%20tests-1%2C315%20passing-success)
+[![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-F59E0B)](LICENSE)
 
 **[⬇️ Download the APK](../../releases/latest)** · **[🌐 Website](https://samosa-ai.com/masala/)** · **[🎮 Play the 317 apps](https://apps.samosa-ai.com/)** · **[🤖 Meet Gotcha](https://samosa-ai.com/gotcha)**
 
@@ -197,7 +198,11 @@ without them the release APK is unsigned.
 
 </details>
 
-Third-party code and fonts, with their licenses, are listed in [`THIRD_PARTY.md`](THIRD_PARTY.md).
+## ⚖️ License
+
+Masala is released under the [GNU Affero General Public License v3.0](LICENSE) (AGPL-3.0).
+Copyright © 2026 Samosa AI. Third-party code and fonts, with their licenses, are listed in
+[`THIRD_PARTY.md`](THIRD_PARTY.md).
 
 ---
 
