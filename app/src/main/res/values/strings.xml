@@ -168,6 +168,8 @@
     <string name="confirm_destructive_title">This can\’t be undone</string>
     <string name="confirm_allow">Allow</string>
     <string name="confirm_cancel">Cancel</string>
+    <string name="confirm_show_details">Show details</string>
+    <string name="confirm_hide_details">Hide details</string>
     <string name="question_title">A question for you</string>
     <string name="question_custom_hint">Or answer in your own words…</string>
     <string name="question_send">Send</string>
