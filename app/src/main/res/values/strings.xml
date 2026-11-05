@@ -102,6 +102,7 @@
     <string name="settings_home_app">Home app</string>
     <string name="settings_home_app_is_default">Masala is your home app</string>
     <string name="settings_home_app_not_default">Masala isn’t your home app yet</string>
+    <string name="settings_no_model">No model set up yet</string>
     <string name="settings_home_app_choose">Choose home app</string>
     <string name="settings_appearance">Appearance</string>
     <string name="settings_theme">Theme</string>
